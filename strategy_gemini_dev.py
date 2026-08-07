@@ -106,6 +106,7 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
     client = genai.Client(api_key=api_key)
 
     registros = []
+    prompts = []
     for dominio in dominios:
         for _ in range(por_dominio):
             prompt = armar_prompt(ejemplos_few_shot, dominio)
@@ -118,8 +119,11 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
                 "texto": texto_generado,
                 "dominio": dominio,
                 "estrategia": "5",
+                "prompt": prompt,
             })
-    return guardar_lote(registros, estrategia="5")
+            prompts.append(prompt)
+    ruta = guardar_lote(registros, estrategia="5")
+    return ruta, prompts
 
 
 # ─────────────────────────────────────────────────────────────

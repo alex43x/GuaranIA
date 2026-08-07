@@ -1,5 +1,11 @@
 import os
+import sys
 from dotenv import load_dotenv
+import json
+from datetime import datetime
+
+# Ensure UTF-8 output on Windows console
+sys.stdout.reconfigure(encoding='utf-8')
 
 # Load environment variables (GEMINI_API_KEY, etc.)
 load_dotenv()
@@ -17,10 +23,11 @@ seed_sentences = [
 domains = ["salud", "educación"]
 
 if __name__ == "__main__":
-    print("=== Ejecutando Estrategia 5 ===")
-    generar_estrategia_5(
+    print("=== Ejecutando Estrategia 5 ===")
+    ruta, prompts = generar_estrategia_5(
         ejemplos_few_shot=seed_sentences,
         dominios=domains,
         por_dominio=5,
     )
-    print("=== Estrategia 5 completada ===")
+    print("=== Estrategia 5 completada ===")
+
