@@ -1,3 +1,4 @@
 .env
 credenciales.json
+__pycache__/
 /seeds
