@@ -1,6 +1,0 @@
-{"texto": "Mbarakaja ho'úta so'o ko'ẽrõ", "texto_base": "Jagua ho'úta so'o ko'ẽrõ", "tipo_transformacion": "sinonimo", "dominio": "vida_cotidiana", "estrategia": "3"}
-{"texto": "Ko'ẽrõ jagua ho'úta so'o", "texto_base": "Jagua ho'úta so'o ko'ẽrõ", "tipo_transformacion": "reordenar", "dominio": "vida_cotidiana", "estrategia": "3"}
-{"texto": "Jagua ho'úta tembi'u ko'ẽrõ", "texto_base": "Jagua ho'úta so'o ko'ẽrõ", "tipo_transformacion": "sinonimo", "dominio": "vida_cotidiana", "estrategia": "3"}
-{"texto": "Aguyje ndéve g̃uarã che angirũ", "texto_base": "Aguyje ndéve g̃uarã che irũ", "tipo_transformacion": "sinonimo", "dominio": "agradecimiento", "estrategia": "3"}
-{"texto": "Che irũ, aguyje ndéve g̃uarã", "texto_base": "Aguyje ndéve g̃uarã che irũ", "tipo_transformacion": "reordenar", "dominio": "agradecimiento", "estrategia": "3"}
-{"texto": "Aguyje ndéve g̃uarã che angirũ", "texto_base": "Aguyje ndéve g̃uarã che irũ", "tipo_transformacion": "sinonimo", "dominio": "agradecimiento", "estrategia": "3"}

@@ -1,0 +1,71 @@
+"""Test de funciones puras de data_wrangler (sin conexión a Sheets ni API)."""
+import sys, os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from data_wrangler import (
+    normalizar_texto, deduplicar_por_texto, clasificar_por_estrategia,
+    _parsear_puntaje, formatear_filas, COLUMNAS_SHEETS, CAMPOS_REQUERIDOS,
+    filtrar_ya_revisados, VALIDACION_MORFOLOGICA
+)
+import tempfile, json
+
+print("=== normalizar_texto ===")
+assert normalizar_texto("Hola!!") == "hola", f"Fallo: {normalizar_texto('Hola!!')}"
+assert normalizar_texto("Sali, corri") == "sali corri"
+assert normalizar_texto("¡Mba'eichapa!!!") == "mba'eichapa"
+print("  OK")
+
+print("=== deduplicar_por_texto ===")
+regs = [
+    {"texto": "Hola!!"},
+    {"texto": "Hola!!!!"},
+    {"texto": "Sali, corri"},
+    {"texto": "Sali y corri"},
+]
+result = deduplicar_por_texto(regs)
+assert len(result) == 3, f"Esperaba 3, obtuve {len(result)}"
+print("  OK")
+
+print("=== clasificar_por_estrategia ===")
+regs = [
+    {"texto": "a", "estrategia": "3"},
+    {"texto": "b", "estrategia": "5"},
+    {"texto": "c", "estrategia": "3"},
+    {"texto": "d", "estrategia": "5"},
+    {"texto": "e", "estrategia": "3"},
+]
+e3, e5 = clasificar_por_estrategia(regs)
+assert len(e3) == 3 and len(e5) == 2
+print("  OK")
+
+print("=== _parsear_puntaje ===")
+assert _parsear_puntaje("5") == 5
+assert _parsear_puntaje(3) == 3
+assert _parsear_puntaje(None) is None
+assert _parsear_puntaje("") is None
+print("  OK")
+
+print("=== formatear_filas ===")
+regs = [
+    {"texto": "Che aguata", "texto_base": "aguata", "tipo_transformacion": "reordenar", "dominio": "vida_cotidiana", "estrategia": "3"},
+    {"texto": "Ha upéi", "texto_base": "upéi", "tipo_transformacion": "sinonimo", "dominio": "conectores", "estrategia": "5"},
+]
+filas = formatear_filas(regs)
+assert len(filas) == 2
+assert len(filas[0]) == 8
+assert filas[0][5] == "" and filas[0][6] == "" and filas[0][7] == ""
+print("  OK")
+
+print("=== COLUMNAS_SHEETS ===")
+assert COLUMNAS_SHEETS == ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia", "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+print("  OK")
+
+print("\n=== filtrar_ya_revisados (sin archivo) ===")
+regs = [{"texto": "a"}, {"texto": "b"}]
+assert len(filtrar_ya_revisados(regs)) == 2
+print("  OK")
+
+print("=== VALIDACION_MORFOLOGICA ===")
+assert VALIDACION_MORFOLOGICA == False
+print(f"  OK (valor: {VALIDACION_MORFOLOGICA})")
+
+print("\nTodas las pruebas pasaron.")
