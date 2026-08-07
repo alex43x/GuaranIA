@@ -3,10 +3,11 @@ import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from data_wrangler import (
     normalizar_texto, deduplicar_por_texto, clasificar_por_estrategia,
-    _parsear_puntaje, formatear_filas, COLUMNAS_SHEETS, CAMPOS_REQUERIDOS,
+    _parsear_puntaje, formatear_filas_e3, formatear_filas_e5,
+    COLUMNAS_E3, COLUMNAS_E5,
     filtrar_ya_revisados, VALIDACION_MORFOLOGICA
 )
-import tempfile, json
+import json
 
 print("=== normalizar_texto ===")
 assert normalizar_texto("Hola!!") == "hola", f"Fallo: {normalizar_texto('Hola!!')}"
@@ -44,19 +45,34 @@ assert _parsear_puntaje(None) is None
 assert _parsear_puntaje("") is None
 print("  OK")
 
-print("=== formatear_filas ===")
+print("=== formatear_filas_e3 ===")
 regs = [
     {"texto": "Che aguata", "texto_base": "aguata", "tipo_transformacion": "reordenar", "dominio": "vida_cotidiana", "estrategia": "3"},
-    {"texto": "Ha upéi", "texto_base": "upéi", "tipo_transformacion": "sinonimo", "dominio": "conectores", "estrategia": "5"},
 ]
-filas = formatear_filas(regs)
-assert len(filas) == 2
+filas = formatear_filas_e3(regs)
+assert len(filas) == 1
+assert filas[0] == ["Che aguata", "aguata", "reordenar", "vida_cotidiana", "3", "", "", ""]
 assert len(filas[0]) == 8
-assert filas[0][5] == "" and filas[0][6] == "" and filas[0][7] == ""
 print("  OK")
 
-print("=== COLUMNAS_SHEETS ===")
-assert COLUMNAS_SHEETS == ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia", "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+print("=== formatear_filas_e5 ===")
+regs = [
+    {"texto": "Ha upei", "dominio": "conectores", "estrategia": "5", "prompt": "Genera una oracion..."},
+]
+filas = formatear_filas_e5(regs)
+assert len(filas) == 1
+assert filas[0] == ["Ha upei", "conectores", "5", "Genera una oracion...", "", "", ""]
+assert len(filas[0]) == 7
+print("  OK")
+
+print("=== COLUMNAS_E3 ===")
+assert COLUMNAS_E3 == ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia",
+                        "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+print("  OK")
+
+print("=== COLUMNAS_E5 ===")
+assert COLUMNAS_E5 == ["texto", "dominio", "estrategia", "prompt",
+                        "puntaje_sintaxis", "puntaje_semantica", "correccion"]
 print("  OK")
 
 print("\n=== filtrar_ya_revisados (sin archivo) ===")

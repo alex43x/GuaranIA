@@ -31,7 +31,10 @@ ARCHIVO_DORADOS = "feedback/dorados.jsonl"
 ARCHIVO_PARA_REGENERAR = "feedback/para_regenerar.jsonl"
 
 CAMPOS_REQUERIDOS = ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia"]
-COLUMNAS_SHEETS = CAMPOS_REQUERIDOS + ["puntaje_sintaxis", "puntaje_semantica", "correccion"]
+COLUMNAS_E3 = ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia",
+               "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+COLUMNAS_E5 = ["texto", "dominio", "estrategia", "prompt",
+               "puntaje_sintaxis", "puntaje_semantica", "correccion"]
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -52,6 +55,8 @@ def backup_raw():
     archivos = glob.glob(os.path.join(CARPETA_RAW, "*.jsonl"))
     if not archivos:
         return
+    for anterior in glob.glob(os.path.join(CARPETA_BACKUPS, "raw_*")):
+        shutil.rmtree(anterior)
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     carpeta_bkp = os.path.join(CARPETA_BACKUPS, f"raw_{ts}")
     os.makedirs(carpeta_bkp, exist_ok=True)
@@ -83,15 +88,20 @@ def _get_cliente():
     return _cliente_sheets
 
 
-def conectar_a_pestana(nombre_pestana: str, crear_si_no_existe: bool = True):
+def conectar_a_pestana(nombre_pestana: str, columnas: list[str], crear_si_no_existe: bool = True):
     cliente = _get_cliente()
     hoja = cliente.open(NOMBRE_HOJA)
     try:
-        return hoja.worksheet(nombre_pestana)
+        pestana = hoja.worksheet(nombre_pestana)
+        primera_fila = pestana.row_values(1)
+        if not primera_fila:
+            pestana.append_row(columnas)
+            print(f"   Pestaña '{nombre_pestana}' existía vacía, cabeceras escritas.")
+        return pestana
     except gspread.exceptions.WorksheetNotFound:
         if crear_si_no_existe:
             pestana = hoja.add_worksheet(title=nombre_pestana, rows="1000", cols="10")
-            pestana.append_row(COLUMNAS_SHEETS)
+            pestana.append_row(columnas)
             print(f"   Pestaña '{nombre_pestana}' creada con cabeceras.")
             return pestana
         raise
@@ -158,13 +168,33 @@ def clasificar_por_estrategia(registros: list[dict]) -> tuple[list[dict], list[d
     e5 = [r for r in registros if str(r.get("estrategia", "")) == "5"]
     return e3, e5
 
-# ─── APERTURA DE PUERTA ───
+# ─── FORMATEO POR ESTRATEGIA ───
 
-def formatear_filas(registros: list[dict]) -> list[list]:
+def formatear_filas_e3(registros: list[dict]) -> list[list]:
     filas = []
     for reg in registros:
-        fila = [reg.get(c, "") for c in CAMPOS_REQUERIDOS]
-        fila.extend(["", "", ""])
+        fila = [
+            reg.get("texto", ""),
+            reg.get("texto_base", ""),
+            reg.get("tipo_transformacion", ""),
+            reg.get("dominio", ""),
+            reg.get("estrategia", ""),
+            "", "", "",
+        ]
+        filas.append(fila)
+    return filas
+
+
+def formatear_filas_e5(registros: list[dict]) -> list[list]:
+    filas = []
+    for reg in registros:
+        fila = [
+            reg.get("texto", ""),
+            reg.get("dominio", ""),
+            reg.get("estrategia", ""),
+            reg.get("prompt", ""),
+            "", "", "",
+        ]
         filas.append(fila)
     return filas
 
@@ -255,13 +285,13 @@ def fase1_subir():
     e3, e5 = clasificar_por_estrategia(registros_validados)
     print(f"\n[Wrangler] Estrategia 3: {len(e3)} | Estrategia 5: {len(e5)}")
 
-    pestana_e3 = conectar_a_pestana(TAB_E3)
-    pestana_e5 = conectar_a_pestana(TAB_E5)
+    pestana_e3 = conectar_a_pestana(TAB_E3, COLUMNAS_E3)
+    pestana_e5 = conectar_a_pestana(TAB_E5, COLUMNAS_E5)
 
     if e3:
         print(f"\n[Wrangler] Subiendo {len(e3)} filas a '{TAB_E3}'...")
         try:
-            n = subir_a_pestana(pestana_e3, formatear_filas(e3))
+            n = subir_a_pestana(pestana_e3, formatear_filas_e3(e3))
             print(f"   OK - {n} filas cargadas en '{TAB_E3}'.")
         except Exception as e:
             print(f"   ERROR al subir a '{TAB_E3}': {e}")
@@ -269,7 +299,7 @@ def fase1_subir():
     if e5:
         print(f"\n[Wrangler] Subiendo {len(e5)} filas a '{TAB_E5}'...")
         try:
-            n = subir_a_pestana(pestana_e5, formatear_filas(e5))
+            n = subir_a_pestana(pestana_e5, formatear_filas_e5(e5))
             print(f"   OK - {n} filas cargadas en '{TAB_E5}'.")
         except Exception as e:
             print(f"   ERROR al subir a '{TAB_E5}': {e}")
@@ -308,7 +338,7 @@ def fase3_clasificar():
 
     for nombre_tab in [TAB_E3, TAB_E5]:
         try:
-            pestana = conectar_a_pestana(nombre_tab, crear_si_no_existe=False)
+            pestana = conectar_a_pestana(nombre_tab, [], crear_si_no_existe=False)
         except gspread.exceptions.WorksheetNotFound:
             print(f"[Wrangler] Pestaña '{nombre_tab}' no existe, se saltea.")
             continue
@@ -320,21 +350,24 @@ def fase3_clasificar():
             print(f"   Sin datos para procesar.")
             continue
 
+        cabecera = [c.strip().lower() for c in filas[0]]
+        idx_correccion = cabecera.index("correccion") if "correccion" in cabecera else -1
+        idx_sintaxis = cabecera.index("puntaje_sintaxis") if "puntaje_sintaxis" in cabecera else -1
+        idx_semantica = cabecera.index("puntaje_semantica") if "puntaje_semantica" in cabecera else -1
+
         for i, fila in enumerate(filas[1:], start=2):
-            if len(fila) < 5:
+            if len(fila) < 2:
                 continue
 
-            registro = {
-                "texto": fila[0].strip() if len(fila) > 0 else "",
-                "texto_base": fila[1].strip() if len(fila) > 1 else "",
-                "tipo_transformacion": fila[2].strip() if len(fila) > 2 else "",
-                "dominio": fila[3].strip() if len(fila) > 3 else "",
-                "estrategia": fila[4].strip() if len(fila) > 4 else "",
-            }
+            registro = {"estrategia": "3" if nombre_tab == TAB_E3 else "5"}
 
-            correccion = fila[7].strip() if len(fila) > 7 else ""
-            puntaje_sintaxis = _parsear_puntaje(fila[5] if len(fila) > 5 else None)
-            puntaje_semantica = _parsear_puntaje(fila[6] if len(fila) > 6 else None)
+            for j, valor in enumerate(fila):
+                if j < len(cabecera):
+                    registro[cabecera[j]] = valor.strip()
+
+            correccion = fila[idx_correccion].strip() if idx_correccion >= 0 and len(fila) > idx_correccion else ""
+            puntaje_sintaxis = _parsear_puntaje(fila[idx_sintaxis] if idx_sintaxis >= 0 and len(fila) > idx_sintaxis else None)
+            puntaje_semantica = _parsear_puntaje(fila[idx_semantica] if idx_semantica >= 0 and len(fila) > idx_semantica else None)
 
             if correccion:
                 registro["correccion"] = correccion
