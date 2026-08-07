@@ -328,6 +328,26 @@ def _parsear_puntaje(valor) -> int | None:
         return None
 
 
+def _pintar_filas_procesadas(pestana, num_columnas, filas_procesadas):
+    if not filas_procesadas:
+        return
+    ultima_col = chr(ord("A") + num_columnas - 1)
+    formato = {"backgroundColor": {"red": 1.0, "green": 0.75, "blue": 0.4}}
+    for num in filas_procesadas:
+        pestana.format(f"A{num}:{ultima_col}{num}", formato)
+    print(f"   L {len(filas_procesadas)} filas pintadas de naranja OK")
+
+
+def _pintar_filas_doradas(pestana, num_columnas, filas_doradas):
+    if not filas_doradas:
+        return
+    ultima_col = chr(ord("A") + num_columnas - 1)
+    formato = {"backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.55}}
+    for num in filas_doradas:
+        pestana.format(f"A{num}:{ultima_col}{num}", formato)
+    print(f"   L {len(filas_doradas)} doradas pintadas de amarillo **")
+
+
 def fase3_clasificar():
     print("=" * 60)
     print("FASE 3: Sheets -> clasificación (acumulado / para_regenerar)")
@@ -360,6 +380,9 @@ def fase3_clasificar():
         idx_semantica = cabecera.index("puntaje_semantica") if "puntaje_semantica" in cabecera else -1
         idx_tipo_error = cabecera.index("tipo_error") if "tipo_error" in cabecera else -1
 
+        filas_procesadas = []
+        filas_doradas = []
+
         for i, fila in enumerate(filas[1:], start=2):
             if len(fila) < 2:
                 continue
@@ -380,21 +403,27 @@ def fase3_clasificar():
                 if tipo_error:
                     registro["tipo_error"] = tipo_error
                 para_regenerar.append(registro)
+                filas_procesadas.append(i)
                 continue
 
             if puntaje_sintaxis is None or puntaje_semantica is None:
                 pendientes += 1
                 continue
 
+            filas_procesadas.append(i)
             if puntaje_sintaxis == 5 and puntaje_semantica == 5:
                 aprobados.append(registro)
                 dorados.append(registro)
+                filas_doradas.append(i)
             else:
                 registro["puntaje_sintaxis"] = puntaje_sintaxis
                 registro["puntaje_semantica"] = puntaje_semantica
                 if tipo_error:
                     registro["tipo_error"] = tipo_error
                 para_regenerar.append(registro)
+
+        _pintar_filas_procesadas(pestana, len(cabecera), filas_procesadas)
+        _pintar_filas_doradas(pestana, len(cabecera), filas_doradas)
 
     print(f"\n[Wrangler] Resultado de clasificación:")
     print(f"   Aprobados (5/5):  {len(aprobados)}")
@@ -416,7 +445,7 @@ def fase3_clasificar():
             with open(ruta, "a", encoding="utf-8") as f:
                 for reg in regs:
                     f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-            print(f"   [+] {len(regs)} aprobados (E{estrategia}) → '{ruta}'.")
+            print(f"   [+] {len(regs)} aprobados (E{estrategia}) -> '{ruta}'.")
 
     if dorados:
         for estrategia, regs in _agrupar_por_estrategia(dorados).items():
@@ -425,7 +454,7 @@ def fase3_clasificar():
             with open(ruta, "w", encoding="utf-8") as f:
                 for reg in regs:
                     f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-            print(f"   [+] {len(regs)} dorados (E{estrategia}) → '{ruta}'.")
+            print(f"   [+] {len(regs)} dorados (E{estrategia}) -> '{ruta}'.")
 
     if para_regenerar:
         for estrategia, regs in _agrupar_por_estrategia(para_regenerar).items():
@@ -434,7 +463,7 @@ def fase3_clasificar():
             with open(ruta, "w", encoding="utf-8") as f:
                 for reg in regs:
                     f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-            print(f"   [+] {len(regs)} para regenerar (E{estrategia}) → '{ruta}'.")
+            print(f"   [+] {len(regs)} para regenerar (E{estrategia}) -> '{ruta}'.")
 
     print("\n[OK] FASE 3 COMPLETADA.")
 
