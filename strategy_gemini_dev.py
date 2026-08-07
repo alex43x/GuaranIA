@@ -135,9 +135,9 @@ if __name__ == "__main__":
     print("=== [Lead Dev] Generando Estrategia 3 ===")
     generar_estrategia_3(semillas, variantes_por_semilla=3)
 
-    # print("\n=== [Lead Dev] Generando Estrategia 5 ===")
-    # generar_estrategia_5(
-    #     ejemplos_few_shot=[s["texto"] for s in semillas],
-    #     dominios=["salud", "educación"],
-    #     por_dominio=5,
-    # )
+    print("\n=== [Lead Dev] Generando Estrategia 5 ===")
+    generar_estrategia_5(
+        ejemplos_few_shot=[s["texto"] for s in semillas],
+        dominios=["salud", "educación"],
+        por_dominio=5,
+    )
