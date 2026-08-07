@@ -1,11 +1,11 @@
 """
 SCRIPTS DEL LEAD DEV — Estrategias 3 y 5
 ==========================================
-Esto es lo que Alex corre para generar. La salida queda en raw/,
-con el nombre que vos (Data Wrangler) esperás para recogerla.
+Esto es lo que el Lead Dev corre para generar. La salida queda en raw/,
+con el nombre que el Data Wrangler espera para recogerla y filtrarla.
 
-Requisitos: pip install anthropic python-dotenv --break-system-packages
-Necesita: .env con API_KEY (la que da la organización)
+Requisitos: pip install google-genai python-dotenv --break-system-packages
+Necesita: .env con GEMINI_API_KEY
 """
 
 import os
@@ -53,21 +53,20 @@ def transformar_oracion(oracion_base: str, client, tipo_cambio: str = "sinonimo"
         )
 
     prompt = f"{instruccion}\n\nOración: {oracion_base}"
-    response = client.messages.create(
-        model="claude-sonnet-4-6",
-        max_tokens=100,
-        messages=[{"role": "user", "content": prompt}],
+    response = client.models.generate_content(
+        model="gemini-3.5-flash",
+        contents=prompt,
     )
-    return response.content[0].text.strip()
+    return response.text.strip()
 
 
 def generar_estrategia_3(oraciones_semilla: list[dict], variantes_por_semilla: int = 3):
-    import anthropic
+    from google import genai
 
-    api_key = os.getenv("API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
     if not api_key:
-        raise ValueError("Falta API_KEY en el .env")
-    client = anthropic.Anthropic(api_key=api_key)
+        raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
+    client = genai.Client(api_key=api_key)
 
     tipos = ["sinonimo", "reordenar"]
     registros = []
@@ -99,23 +98,22 @@ def armar_prompt(ejemplos: list[str], dominio: str) -> str:
 
 
 def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_dominio: int = 10):
-    import anthropic
+    from google import genai
 
-    api_key = os.getenv("API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
     if not api_key:
-        raise ValueError("Falta API_KEY en el .env")
-    client = anthropic.Anthropic(api_key=api_key)
+        raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
+    client = genai.Client(api_key=api_key)
 
     registros = []
     for dominio in dominios:
         for _ in range(por_dominio):
             prompt = armar_prompt(ejemplos_few_shot, dominio)
-            response = client.messages.create(
-                model="claude-sonnet-4-6",
-                max_tokens=100,
-                messages=[{"role": "user", "content": prompt}],
+            response = client.models.generate_content(
+                model="gemini-3.5-flash",
+                contents=prompt,
             )
-            texto_generado = response.content[0].text.strip()
+            texto_generado = response.text.strip()
             registros.append({
                 "texto": texto_generado,
                 "dominio": dominio,
@@ -125,6 +123,8 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
 
 
 # ─────────────────────────────────────────────────────────────
+# Main
+# ─────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     # Oraciones semilla de ejemplo (en el evento real: seed set oficial o Jojajovai)
     semillas = [
@@ -132,11 +132,10 @@ if __name__ == "__main__":
         {"texto": "Aguyje ndéve g̃uarã che irũ", "dominio": "agradecimiento"},
     ]
 
-    print("=== Generando Estrategia 3 ===")
+    print("=== [Lead Dev] Generando Estrategia 3 ===")
     generar_estrategia_3(semillas, variantes_por_semilla=3)
 
-    print("\n=== Generando Estrategia 5 (requiere API key real) ===")
-    print("Descomentá la línea de abajo cuando tengas la key configurada:")
+    # print("\n=== [Lead Dev] Generando Estrategia 5 ===")
     # generar_estrategia_5(
     #     ejemplos_few_shot=[s["texto"] for s in semillas],
     #     dominios=["salud", "educación"],
