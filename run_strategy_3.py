@@ -85,7 +85,7 @@ if __name__ == "__main__":
             truncated_path = output_path.replace('.jsonl', f'_{desired_total}.jsonl')
             with open(truncated_path, "w", encoding="utf-8") as f:
                 f.writelines(lines[:desired_total])
-            print(f"Truncated to {desired_total} records → {truncated_path}")
+            print(f"Truncated to {desired_total} records -> {truncated_path}")
         else:
             print(f"Generated {len(lines)} records (<= {desired_total}). No truncation needed.")
 
