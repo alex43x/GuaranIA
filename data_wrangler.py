@@ -2,7 +2,7 @@
 DATA WRANGLER — Pipeline completo de filtrado, validación y carga a Google Sheets
 ==================================================================================
 FASE 1: raw/ -> validación morfológica -> Sheets (pestañas estrategia_3 / estrategia_5)
-FASE 3: Sheets -> clasificación -> dataset_acumulado.jsonl / feedback / rechazados
+FASE 3: Sheets -> clasificación -> dataset_acumulado_estrategia{3,5}.jsonl / feedback / rechazados
 
 Requisitos: pip install gspread google-auth gradio_client
 Necesita: credenciales.json (Cuenta de Servicio de Google Cloud)
@@ -26,15 +26,20 @@ CARPETA_PROCESADOS = "procesados"
 CARPETA_RECHAZADOS = "rechazados"
 CARPETA_FEEDBACK = "feedback"
 CARPETA_BACKUPS = "backups"
-ARCHIVO_DATASET = "dataset_acumulado.jsonl"
-ARCHIVO_DORADOS = "feedback/dorados.jsonl"
-ARCHIVO_PARA_REGENERAR = "feedback/para_regenerar.jsonl"
+def _ruta_acumulado(estrategia: str) -> str:
+    return f"dataset_acumulado_estrategia{estrategia}.jsonl"
+
+def _ruta_dorados(estrategia: str) -> str:
+    return f"feedback/estrategia{estrategia}/dorados.jsonl"
+
+def _ruta_para_regenerar(estrategia: str) -> str:
+    return f"feedback/estrategia{estrategia}/para_regenerar.jsonl"
 
 CAMPOS_REQUERIDOS = ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia"]
 COLUMNAS_E3 = ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia",
-               "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+               "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error"]
 COLUMNAS_E5 = ["texto", "dominio", "estrategia", "prompt",
-               "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+               "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error"]
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -55,8 +60,6 @@ def backup_raw():
     archivos = glob.glob(os.path.join(CARPETA_RAW, "*.jsonl"))
     if not archivos:
         return
-    for anterior in glob.glob(os.path.join(CARPETA_BACKUPS, "raw_*")):
-        shutil.rmtree(anterior)
     ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
     carpeta_bkp = os.path.join(CARPETA_BACKUPS, f"raw_{ts}")
     os.makedirs(carpeta_bkp, exist_ok=True)
@@ -137,19 +140,21 @@ def filtrar_registros(registros: list[dict]) -> list[dict]:
 # ─── FILTRADO CONTRA DATASET ACUMULADO ───
 
 def filtrar_ya_revisados(registros: list[dict]) -> list[dict]:
-    if not os.path.exists(ARCHIVO_DATASET):
-        return registros
     textos_aprobados = set()
-    with open(ARCHIVO_DATASET, "r", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                try:
-                    reg = json.loads(line.strip())
-                    clave = normalizar_texto(reg.get("texto", ""))
-                    if clave:
-                        textos_aprobados.add(clave)
-                except json.JSONDecodeError:
-                    pass
+    for estrategia in ["3", "5"]:
+        ruta = _ruta_acumulado(estrategia)
+        if not os.path.exists(ruta):
+            continue
+        with open(ruta, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        reg = json.loads(line.strip())
+                        clave = normalizar_texto(reg.get("texto", ""))
+                        if clave:
+                            textos_aprobados.add(clave)
+                    except json.JSONDecodeError:
+                        pass
     if not textos_aprobados:
         return registros
     nuevos = []
@@ -179,7 +184,7 @@ def formatear_filas_e3(registros: list[dict]) -> list[list]:
             reg.get("tipo_transformacion", ""),
             reg.get("dominio", ""),
             reg.get("estrategia", ""),
-            "", "", "",
+            "", "", "", "",
         ]
         filas.append(fila)
     return filas
@@ -193,7 +198,7 @@ def formatear_filas_e5(registros: list[dict]) -> list[list]:
             reg.get("dominio", ""),
             reg.get("estrategia", ""),
             reg.get("prompt", ""),
-            "", "", "",
+            "", "", "", "",
         ]
         filas.append(fila)
     return filas
@@ -325,15 +330,14 @@ def _parsear_puntaje(valor) -> int | None:
 
 def fase3_clasificar():
     print("=" * 60)
-    print("FASE 3: Sheets -> clasificación (aprobado / corregido / rechazado)")
+    print("FASE 3: Sheets -> clasificación (acumulado / para_regenerar)")
     print("=" * 60)
 
     asegurar_carpetas()
 
     aprobados = []
     dorados = []
-    corregidos = []
-    rechazados = []
+    para_regenerar = []
     pendientes = 0
 
     for nombre_tab in [TAB_E3, TAB_E5]:
@@ -354,6 +358,7 @@ def fase3_clasificar():
         idx_correccion = cabecera.index("correccion") if "correccion" in cabecera else -1
         idx_sintaxis = cabecera.index("puntaje_sintaxis") if "puntaje_sintaxis" in cabecera else -1
         idx_semantica = cabecera.index("puntaje_semantica") if "puntaje_semantica" in cabecera else -1
+        idx_tipo_error = cabecera.index("tipo_error") if "tipo_error" in cabecera else -1
 
         for i, fila in enumerate(filas[1:], start=2):
             if len(fila) < 2:
@@ -366,62 +371,70 @@ def fase3_clasificar():
                     registro[cabecera[j]] = valor.strip()
 
             correccion = fila[idx_correccion].strip() if idx_correccion >= 0 and len(fila) > idx_correccion else ""
+            tipo_error = fila[idx_tipo_error].strip() if idx_tipo_error >= 0 and len(fila) > idx_tipo_error else ""
             puntaje_sintaxis = _parsear_puntaje(fila[idx_sintaxis] if idx_sintaxis >= 0 and len(fila) > idx_sintaxis else None)
             puntaje_semantica = _parsear_puntaje(fila[idx_semantica] if idx_semantica >= 0 and len(fila) > idx_semantica else None)
 
             if correccion:
                 registro["correccion"] = correccion
-                corregidos.append(registro)
+                if tipo_error:
+                    registro["tipo_error"] = tipo_error
+                para_regenerar.append(registro)
                 continue
 
             if puntaje_sintaxis is None or puntaje_semantica is None:
                 pendientes += 1
                 continue
 
-            if puntaje_sintaxis >= 4 and puntaje_semantica >= 4:
+            if puntaje_sintaxis == 5 and puntaje_semantica == 5:
                 aprobados.append(registro)
-                if puntaje_sintaxis == 5 and puntaje_semantica == 5:
-                    dorados.append(registro)
+                dorados.append(registro)
             else:
                 registro["puntaje_sintaxis"] = puntaje_sintaxis
                 registro["puntaje_semantica"] = puntaje_semantica
-                rechazados.append(registro)
+                if tipo_error:
+                    registro["tipo_error"] = tipo_error
+                para_regenerar.append(registro)
 
     print(f"\n[Wrangler] Resultado de clasificación:")
-    print(f"   Aprobados:  {len(aprobados)}")
-    print(f"   Corregidos: {len(corregidos)}")
-    print(f"   Dorados (5/5): {len(dorados)}")
-    print(f"   Rechazados: {len(rechazados)}")
+    print(f"   Aprobados (5/5):  {len(aprobados)}")
+    print(f"   Dorados (5/5):    {len(dorados)}")
+    print(f"   Para regenerar:   {len(para_regenerar)}")
     if pendientes > 0:
         print(f"   Pendientes (sin revisar): {pendientes}")
 
+    def _agrupar_por_estrategia(registros):
+        grupos = {}
+        for reg in registros:
+            e = reg.get("estrategia", "desconocida")
+            grupos.setdefault(e, []).append(reg)
+        return grupos
+
     if aprobados:
-        with open(ARCHIVO_DATASET, "a", encoding="utf-8") as f:
-            for reg in aprobados:
-                f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-        print(f"\n   [+] {len(aprobados)} registros agregados a '{ARCHIVO_DATASET}'.")
+        for estrategia, regs in _agrupar_por_estrategia(aprobados).items():
+            ruta = _ruta_acumulado(estrategia)
+            with open(ruta, "a", encoding="utf-8") as f:
+                for reg in regs:
+                    f.write(json.dumps(reg, ensure_ascii=False) + "\n")
+            print(f"   [+] {len(regs)} aprobados (E{estrategia}) → '{ruta}'.")
 
     if dorados:
-        os.makedirs(os.path.dirname(ARCHIVO_DORADOS), exist_ok=True)
-        with open(ARCHIVO_DORADOS, "w", encoding="utf-8") as f:
-            for reg in dorados:
-                f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-        print(f"   [+] {len(dorados)} dorados (5/5) escritos a '{ARCHIVO_DORADOS}'.")
+        for estrategia, regs in _agrupar_por_estrategia(dorados).items():
+            ruta = _ruta_dorados(estrategia)
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            with open(ruta, "w", encoding="utf-8") as f:
+                for reg in regs:
+                    f.write(json.dumps(reg, ensure_ascii=False) + "\n")
+            print(f"   [+] {len(regs)} dorados (E{estrategia}) → '{ruta}'.")
 
-    if corregidos:
-        os.makedirs(os.path.dirname(ARCHIVO_PARA_REGENERAR), exist_ok=True)
-        with open(ARCHIVO_PARA_REGENERAR, "w", encoding="utf-8") as f:
-            for reg in corregidos:
-                f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-        print(f"   [+] {len(corregidos)} registros escritos a '{ARCHIVO_PARA_REGENERAR}'.")
-
-    if rechazados:
-        ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        ruta_rechazo = os.path.join(CARPETA_RECHAZADOS, f"rechazados_{ts}.jsonl")
-        with open(ruta_rechazo, "w", encoding="utf-8") as f:
-            for reg in rechazados:
-                f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-        print(f"   [+] {len(rechazados)} registros escritos a '{ruta_rechazo}'.")
+    if para_regenerar:
+        for estrategia, regs in _agrupar_por_estrategia(para_regenerar).items():
+            ruta = _ruta_para_regenerar(estrategia)
+            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+            with open(ruta, "w", encoding="utf-8") as f:
+                for reg in regs:
+                    f.write(json.dumps(reg, ensure_ascii=False) + "\n")
+            print(f"   [+] {len(regs)} para regenerar (E{estrategia}) → '{ruta}'.")
 
     print("\n[OK] FASE 3 COMPLETADA.")
 
