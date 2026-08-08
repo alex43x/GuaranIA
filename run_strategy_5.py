@@ -14,10 +14,10 @@ load_dotenv()
 from strategy_gemini_dev import generar_estrategia_5
 
 # Path to the seed file
-SEED_FILE = os.path.join("seeds", "jojajovai.jsonl")
+SEED_FILE = os.path.join("seeds", "tatoeba.jsonl")
 
 # Load seed sentences from the JSONL file
-def cargar_seeds(path: str, campo: str = "text", max_seeds: int = 10) -> list[str]:
+def cargar_seeds(path: str, campo: str = "text", max_seeds: int = 25) -> list[str]:
     """Load seed sentences from a JSONL file, sampling up to max_seeds."""
     seeds = []
     with open(path, "r", encoding="utf-8") as f:

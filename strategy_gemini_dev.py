@@ -90,10 +90,10 @@ def generar_estrategia_3(oraciones_semilla: list[dict], variantes_por_semilla: i
 def armar_prompt(ejemplos: list[str], dominio: str) -> str:
     ejemplos_texto = "\n".join(f"- {e}" for e in ejemplos)
     return (
-        f"Sos un hablante nativo de guaraní paraguayo. Generá 1 frase nueva, "
-        f"natural (no traducción literal del español), en el dominio: {dominio}.\n\n"
-        f"Ejemplos del estilo esperado:\n{ejemplos_texto}\n\n"
-        f"Devolvé solo la frase nueva, sin explicaciones."
+        f"Sos un hablante nativo de guaraní paraguayo. Tu tarea es leer las siguientes frases y generar 1 frase nueva "
+        f"que esté fuertemente basada en el contenido, tema o estructura de estos ejemplos, pero adaptada o enfocada en el dominio: {dominio}.\n\n"
+        f"Frases base:\n{ejemplos_texto}\n\n"
+        f"Devolvé solo la frase nueva generada, sin explicaciones ni comillas."
     )
 
 
