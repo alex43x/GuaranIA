@@ -19,11 +19,21 @@ load_dotenv()
 CARPETA_RAW = "raw"
 
 
-def guardar_lote(registros: list[dict], estrategia: str) -> str:
-    """Guarda el lote generado en raw/, con el nombre que espera Data Wrangler."""
-    os.makedirs(CARPETA_RAW, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
-    ruta = os.path.join(CARPETA_RAW, f"estrategia{estrategia}_lote_{timestamp}.jsonl")
+def guardar_lote(registros: list[dict], estrategia: str, subcarpeta: str | None = None) -> str:
+    """Guarda el lote generado en raw/, con el nombre que espera Data Wrangler.
+    
+    Si 'subcarpeta' se especifica, la ruta será: raw/<subcarpeta>/lote_<timestamp>.jsonl
+    En caso contrario: raw/estrategia<N>_lote_<timestamp>.jsonl  (comportamiento original).
+    """
+    if subcarpeta:
+        carpeta = os.path.join(CARPETA_RAW, subcarpeta)
+        os.makedirs(carpeta, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
+    else:
+        os.makedirs(CARPETA_RAW, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+        ruta = os.path.join(CARPETA_RAW, f"estrategia{estrategia}_lote_{timestamp}.jsonl")
     with open(ruta, "w", encoding="utf-8") as f:
         for reg in registros:
             f.write(json.dumps(reg, ensure_ascii=False) + "\n")
@@ -143,7 +153,9 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
             })
             prompts.append(prompt)
             print(f"  [{actual}/{total}] dominio={dominio} ✓")
-    ruta = guardar_lote(registros, estrategia="5")
+    seed_stem = os.path.splitext(seed_file_name)[0] if seed_file_name else None
+    subcarpeta = f"estrategia5/{seed_stem}" if seed_stem else None
+    ruta = guardar_lote(registros, estrategia="5", subcarpeta=subcarpeta)
     return ruta, prompts
 
 
