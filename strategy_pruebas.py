@@ -62,26 +62,69 @@ def llamar_gemini_con_reintentos(client, prompt: str):
 # ─────────────────────────────────────────────────────────────
 # ESTRATEGIA 3 — Transformaciones controladas
 # ─────────────────────────────────────────────────────────────
-def transformar_oracion(oracion_base: str, client, tipo_cambio: str = "sinonimo") -> str:
+def _normalizar_para_comparar(texto: str) -> str:
+    """Normaliza para detectar 'sin cambio real' aunque varíe mayúsculas/espacios/puntuación."""
+    import re
+    t = texto.lower().strip()
+    t = re.sub(r"[.,;:!?¡¿'\"]", "", t)
+    t = re.sub(r"\s+", " ", t)
+    return t
+
+
+def transformar_oracion(oracion_base: str, client, tipo_cambio: str = "sinonimo") -> str | None:
     """
     Usa el LLM para hacer UN cambio puntual y acotado sobre la oración,
     no una generación libre. tipo_cambio: "sinonimo" o "reordenar".
+
+    Devuelve None si:
+    - la oración es demasiado corta para "reordenar" (< 3 palabras), o
+    - Gemini devolvió la oración prácticamente sin cambios (no encontró
+      una variación válida) — esto se detecta, no se guarda como si
+      fuera una variante real.
     """
+    n_palabras = len(oracion_base.split())
+
+    if tipo_cambio == "reordenar" and n_palabras < 3:
+        print(f"    Oración muy corta ({n_palabras} palabras) para reordenar, se omite este tipo.")
+        return None
+
     if tipo_cambio == "sinonimo":
         instruccion = (
-            "Reescribí esta oración en guaraní cambiando SOLO una palabra "
-            "por un sinónimo o palabra relacionada. No cambies nada más, "
-            "no agregues ni quites palabras. Devolvé solo la oración resultante."
+            "Reescribí esta oración en guaraní cambiando lo que realmente pueda "
+            "reemplazarse por un sinónimo o expresión equivalente — puede ser una "
+            "sola palabra, o una expresión corta si esa es la unidad de significado "
+            "real (por ejemplo, una locución que funciona como una sola idea). "
+            "No cambies nada que no tenga un sinónimo razonable, no agregues ni "
+            "quites contenido que no sea parte del reemplazo. Devolvé solo la "
+            "oración resultante. Si la oración es tan corta que no hay nada con "
+            "sinónimo razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
         )
     else:  # reordenar
         instruccion = (
-            "Reescribí esta oración en guaraní moviendo UN fragmento de lugar "
-            "(por ejemplo, el orden de una frase adverbial), sin cambiar el "
-            "significado ni agregar/quitar palabras. Devolvé solo la oración resultante."
+            "Reescribí esta oración en guaraní moviendo el fragmento que realmente "
+            "admita reordenarse sin romper el significado (por ejemplo, una frase "
+            "adverbial, un complemento, o el orden de una cláusula) — el tamaño de "
+            "ese fragmento depende de la oración, no tiene que ser una sola palabra. "
+            "No agregues ni quites palabras, solo cambiá el orden. Devolvé solo la "
+            "oración resultante. Si la oración es tan corta o simple que no hay "
+            "ningún reordenamiento razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
         )
 
     prompt = f"{instruccion}\n\nOración: {oracion_base}"
-    return llamar_gemini_con_reintentos(client, prompt)
+    resultado = llamar_gemini_con_reintentos(client, prompt)
+
+    if resultado is None:
+        return None
+
+    if "SIN_VARIACION_POSIBLE" in resultado:
+        print(f"    Gemini indicó que no hay variación posible para: \"{oracion_base}\"")
+        return None
+
+    if _normalizar_para_comparar(resultado) == _normalizar_para_comparar(oracion_base):
+        print(f"    ⚠️  La 'variante' salió idéntica a la original, se descarta: \"{oracion_base}\"")
+        return None
+
+    return resultado
 
 
 def generar_estrategia_3(oraciones_semilla: list[dict], variantes_por_semilla: int = 3):
@@ -95,13 +138,14 @@ def generar_estrategia_3(oraciones_semilla: list[dict], variantes_por_semilla: i
     tipos = ["sinonimo", "reordenar"]
     registros = []
     fallidas = 0
+    sin_variacion = 0
     for semilla in oraciones_semilla:
         for i in range(variantes_por_semilla):
             tipo = tipos[i % len(tipos)]  # alterna entre sinónimo y reordenar
             variante = transformar_oracion(semilla["texto"], client, tipo_cambio=tipo)
             if variante is None:
-                fallidas += 1
-                continue  # se omite, pero el lote sigue con las demás
+                sin_variacion += 1
+                continue  # se omite: sin variación posible, no un error de API
             registros.append({
                 "texto": variante,
                 "texto_base": semilla["texto"],
@@ -109,8 +153,9 @@ def generar_estrategia_3(oraciones_semilla: list[dict], variantes_por_semilla: i
                 "dominio": semilla.get("dominio", "sin_clasificar"),
                 "estrategia": "3",
             })
-    if fallidas > 0:
-        print(f"⚠️  {fallidas} oraciones fallaron incluso con reintentos y se omitieron.")
+    if sin_variacion > 0:
+        print(f"ℹ️  {sin_variacion} intentos sin variación posible (oración muy corta, "
+              f"o resultado idéntico al original) — no son errores, se omitieron.")
     return guardar_lote(registros, estrategia="3")
 
 
@@ -127,7 +172,7 @@ def armar_prompt(ejemplos: list[str], dominio: str) -> str:
     )
 
 
-def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_dominio: int = 10, seed_file_name: str = "") -> tuple[str, list[str]]:
+def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_dominio: int = 10):
     from google import genai
 
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
@@ -137,22 +182,23 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
 
     registros = []
     prompts = []
+    fallidas = 0
     for dominio in dominios:
         for _ in range(por_dominio):
             prompt = armar_prompt(ejemplos_few_shot, dominio)
-            response = client.models.generate_content(
-                model="gemini-3.5-flash",
-                contents=prompt,
-            )
-            texto_generado = response.text.strip()
+            texto_generado = llamar_gemini_con_reintentos(client, prompt)
+            if texto_generado is None:
+                fallidas += 1
+                continue
             registros.append({
                 "texto": texto_generado,
                 "dominio": dominio,
                 "estrategia": "5",
                 "prompt": prompt,
-                "seed_file": seed_file_name,
             })
             prompts.append(prompt)
+    if fallidas > 0:
+        print(f"⚠️  {fallidas} generaciones fallaron incluso con reintentos y se omitieron.")
     ruta = guardar_lote(registros, estrategia="5")
     return ruta, prompts
 
