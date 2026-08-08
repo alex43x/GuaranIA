@@ -205,7 +205,7 @@ if __name__ == "__main__":
     if rutas and archivos:
         for path in archivos:
             seed_dir = os.path.basename(os.path.dirname(path))
-            destino_dir = os.path.join(PROCESADOS_E3_DIR, seed_dir)
+            destino_dir = os.path.join(PROCESADOS_E3_DIR, "reordenar", seed_dir)
             os.makedirs(destino_dir, exist_ok=True)
             destino = os.path.join(destino_dir, os.path.basename(path))
             os.rename(path, destino)

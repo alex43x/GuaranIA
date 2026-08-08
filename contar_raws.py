@@ -21,6 +21,8 @@ CARPETA_CONTEOS = "conteos"
 CARPETA_E3_RAW = "raw/estrategia3"
 CARPETA_E5_RAW = "raw/estrategia5"
 CARPETA_E5_PROCESADOS = "raw/estrategia5/procesados_estrategia_3"
+CARPETA_E5_PROCESADOS_REORD = os.path.join(CARPETA_E5_PROCESADOS, "reordenar")
+CARPETA_E5_PROCESADOS_SIN = os.path.join(CARPETA_E5_PROCESADOS, "sinonimo")
 
 
 def contar_estrategia(carpeta: str, excluir: list[str] | None = None) -> tuple[dict, int]:
@@ -67,14 +69,38 @@ def _formatear_tabla(conteo: dict, nivel: int = 0) -> tuple[str, int]:
 # ─── ESTRATEGIA 3 ───
 
 def seccion_estrategia_3() -> tuple[str, int]:
-    conteo, archivos = contar_estrategia(CARPETA_E3_RAW)
+    conteo_reord, arch_reord = contar_estrategia(os.path.join(CARPETA_E3_RAW, "**", "reordenar"))
+    conteo_sin, arch_sin = contar_estrategia(os.path.join(CARPETA_E3_RAW, "**", "sinonimo"))
+
     lineas = [
         f"\n*** ESTRATEGIA 3 ***",
         "-" * 70,
-        f"Archivos: {archivos}",
+        f"Archivos: {arch_reord + arch_sin}",
     ]
-    tabla, total = _formatear_tabla(conteo)
-    lineas.append(tabla)
+
+    # Reordenar
+    lineas.append(f"\n  --- Reordenar ---")
+    lineas.append("  " + "-" * 68)
+    if conteo_reord:
+        tabla, total_reord = _formatear_tabla(conteo_reord, nivel=1)
+        lineas.append(tabla)
+    else:
+        lineas.append("  (ninguno)")
+        total_reord = 0
+    lineas.append(f"\n  --- {'Total reordenar':<35s} {total_reord:>6d}")
+
+    # Sinónimo
+    lineas.append(f"\n  --- Sinónimo ---")
+    lineas.append("  " + "-" * 68)
+    if conteo_sin:
+        tabla, total_sin = _formatear_tabla(conteo_sin, nivel=1)
+        lineas.append(tabla)
+    else:
+        lineas.append("  (ninguno)")
+        total_sin = 0
+    lineas.append(f"\n  --- {'Total sinónimo':<35s} {total_sin:>6d}")
+
+    total = total_reord + total_sin
     lineas.append(f"\n  {'Total ESTRATEGIA 3':<30s} {total:>6d}")
     return "\n".join(lineas), total
 
@@ -83,7 +109,9 @@ def seccion_estrategia_3() -> tuple[str, int]:
 
 def seccion_estrategia_5() -> tuple[str, int]:
     conteo_pend, arch_pend = contar_estrategia(CARPETA_E5_RAW, excluir=["procesados_estrategia_3"])
-    conteo_proc, arch_proc = contar_estrategia(CARPETA_E5_PROCESADOS)
+    conteo_reord, arch_reord = contar_estrategia(CARPETA_E5_PROCESADOS_REORD)
+    conteo_sin, arch_sin = contar_estrategia(CARPETA_E5_PROCESADOS_SIN)
+    arch_proc = arch_reord + arch_sin
 
     lineas = [
         f"\n*** ESTRATEGIA 5 ***",
@@ -102,17 +130,29 @@ def seccion_estrategia_5() -> tuple[str, int]:
         total_pend = 0
     lineas.append(f"\n  --- {'Total pendientes':<35s} {total_pend:>6d}")
 
-    # Procesados
-    lineas.append(f"\n  --- Ya procesados por Estrategia 3 ---")
+    # Procesados: reordenar
+    lineas.append(f"\n  --- Procesados por Reordenar ---")
     lineas.append("  " + "-" * 68)
-    if conteo_proc:
-        tabla, total_proc = _formatear_tabla(conteo_proc, nivel=1)
+    if conteo_reord:
+        tabla, total_reord = _formatear_tabla(conteo_reord, nivel=1)
         lineas.append(tabla)
     else:
         lineas.append("  (ninguno)")
-        total_proc = 0
-    lineas.append(f"\n  --- {'Total procesados':<35s} {total_proc:>6d}")
+        total_reord = 0
+    lineas.append(f"\n  --- {'Total reordenar':<35s} {total_reord:>6d}")
 
+    # Procesados: sinónimo
+    lineas.append(f"\n  --- Procesados por Sinónimo ---")
+    lineas.append("  " + "-" * 68)
+    if conteo_sin:
+        tabla, total_sin = _formatear_tabla(conteo_sin, nivel=1)
+        lineas.append(tabla)
+    else:
+        lineas.append("  (ninguno)")
+        total_sin = 0
+    lineas.append(f"\n  --- {'Total sinónimo':<35s} {total_sin:>6d}")
+
+    total_proc = total_reord + total_sin
     total = total_pend + total_proc
     lineas.append(f"\n  {'Total ESTRATEGIA 5':<30s} {total:>6d}")
     return "\n".join(lineas), total
