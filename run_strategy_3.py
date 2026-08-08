@@ -20,7 +20,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from strategy_gemini_dev import generar_estrategia_3
+from strategy_pruebas import generar_estrategia_3
 
 # --------------------------------------------------------------------
 # Fuente: lo que generó la Estrategia 5, NO el corpus externo (seeds/).
@@ -38,11 +38,13 @@ ESTRATEGIA_5_VALIDADA = False
 TOTAL_DESEADO = 100
 
 # ── MODO PRUEBA ──
-# Con MODO_PRUEBA=True, solo toma las primeras LIMITE_PRUEBA semillas
-# y genera 1 variante de cada una — rápido, para confirmar que anda
-# antes de correr el lote completo. Poné False para el lote real.
+# Con MODO_PRUEBA=True, solo toma las primeras LIMITE_PRUEBA semillas,
+# pero SÍ intenta VARIANTES_PRUEBA variantes de cada una — así ves
+# cuántas variaciones reales salen (algunas pueden no tener variación
+# posible, ver la nota "sin variación posible" al terminar).
 MODO_PRUEBA = True
 LIMITE_PRUEBA = 3
+VARIANTES_PRUEBA = 3  # intentos por semilla — subilo si querés ver más variedad
 
 
 def cargar_datos_estrategia_5() -> list[dict]:
@@ -94,9 +96,10 @@ if __name__ == "__main__":
 
     if MODO_PRUEBA:
         semillas = semillas[:LIMITE_PRUEBA]
-        variantes_por_semilla = 1
-        print(f"🧪 MODO PRUEBA: usando solo {len(semillas)} semilla(s), "
-              f"1 variante cada una ({len(semillas)} llamadas en total).")
+        variantes_por_semilla = VARIANTES_PRUEBA
+        total_intentos = len(semillas) * variantes_por_semilla
+        print(f"🧪 MODO PRUEBA: {len(semillas)} semilla(s), hasta {variantes_por_semilla} "
+              f"variante(s) cada una ({total_intentos} llamadas a Gemini como máximo).")
     else:
         # Calcular variantes por semilla para acercarse al total deseado
         variantes_por_semilla = max(1, math.ceil(TOTAL_DESEADO / len(semillas)))
@@ -107,7 +110,12 @@ if __name__ == "__main__":
     output_path = generar_estrategia_3(semillas, variantes_por_semilla=variantes_por_semilla)
 
     if MODO_PRUEBA:
-        print(f"=== Prueba completada: revisá {output_path} ===")
+        with open(output_path, "r", encoding="utf-8") as f:
+            lineas_generadas = [ln for ln in f if ln.strip()]
+        print(f"=== Prueba completada ===")
+        print(f"    Intentos:  {total_intentos} (máximo posible)")
+        print(f"    Logradas:  {len(lineas_generadas)} variantes reales")
+        print(f"    Revisá el detalle en: {output_path}")
         print("    Cuando confirmes que anda bien, poné MODO_PRUEBA = False "
               "y volvé a correr para el lote completo.")
     else:
