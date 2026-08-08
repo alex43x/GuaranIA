@@ -22,12 +22,22 @@ MAX_REINTENTOS = 3
 ESPERA_ENTRE_REINTENTOS = 5  # segundos, se duplica en cada intento
 
 
-def guardar_lote(registros: list[dict], estrategia: str) -> str:
-    """Guarda el lote generado en raw/estrategia{N}/, separado por estrategia."""
-    carpeta = os.path.join(CARPETA_RAW, f"estrategia{estrategia}")
-    os.makedirs(carpeta, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # con segundos, para no pisarse en pruebas rápidas
-    ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
+def guardar_lote(registros: list[dict], estrategia: str, subcarpeta: str | None = None) -> str:
+    """Guarda el lote generado en raw/, con el nombre que espera Data Wrangler.
+
+    Si 'subcarpeta' se especifica, la ruta será: raw/<subcarpeta>/lote_<timestamp>.jsonl
+    En caso contrario: raw/estrategia{N}/lote_<timestamp>.jsonl (comportamiento original).
+    """
+    if subcarpeta:
+        carpeta = os.path.join(CARPETA_RAW, subcarpeta)
+        os.makedirs(carpeta, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
+    else:
+        carpeta = os.path.join(CARPETA_RAW, f"estrategia{estrategia}")
+        os.makedirs(carpeta, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
     with open(ruta, "w", encoding="utf-8") as f:
         for reg in registros:
             f.write(json.dumps(reg, ensure_ascii=False) + "\n")
@@ -143,9 +153,13 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
 
     registros = []
     sin_variacion = 0
-    for semilla in oraciones_semilla:
-        variantes_vistas = []  # normalizadas, para no contar duplicados como "nueva variante"
+    total = len(oraciones_semilla)
+    for i, semilla in enumerate(oraciones_semilla, 1):
+        variantes_vistas = []
         intentos_sin_exito_seguidos = 0
+        seed_file = semilla.get("seed_file", "")
+        seed_tag = os.path.splitext(os.path.basename(seed_file))[0] if seed_file else "?"
+        preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
 
         for _ in range(max_reordenaciones):
             variante = transformar_oracion(semilla["texto"], client, tipo_cambio="reordenar")
@@ -154,7 +168,7 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
                 sin_variacion += 1
                 intentos_sin_exito_seguidos += 1
                 if intentos_sin_exito_seguidos >= 2:
-                    break  # ya insistió 2 veces sin éxito, no hay más variación real
+                    break
                 continue
 
             clave = _normalizar_para_comparar(variante)
@@ -162,7 +176,7 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
                 intentos_sin_exito_seguidos += 1
                 if intentos_sin_exito_seguidos >= 2:
                     break
-                continue  # repetida, no es una variante nueva
+                continue
 
             variantes_vistas.append(clave)
             intentos_sin_exito_seguidos = 0
@@ -172,11 +186,32 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
                 "tipo_transformacion": "reordenar",
                 "dominio": semilla.get("dominio", "sin_clasificar"),
                 "estrategia": "3",
+                "seed_file": seed_file,
             })
+
+        n = len(variantes_vistas)
+        print(f"  [{i}/{total}] ({seed_tag}) \"{preview}\" → {n} variantes", flush=True)
     if sin_variacion > 0:
         print(f"ℹ️  {sin_variacion} intentos sin variación posible (oración muy corta, "
               f"o resultado idéntico al original) — no son errores, se omitieron.")
-    return guardar_lote(registros, estrategia="3")
+
+    # Agrupar por seed_file y guardar en subcarpetas (análogo a Estrategia 5)
+    agrupados: dict[str, list[dict]] = {}
+    for reg in registros:
+        key = reg.get("seed_file", "")
+        agrupados.setdefault(key, []).append(reg)
+
+    rutas = []
+    for seed_file, grupo in agrupados.items():
+        if seed_file:
+            seed_stem = os.path.splitext(os.path.basename(seed_file))[0]
+            subcarpeta = os.path.join("estrategia3", seed_stem, "reordenar")
+            ruta = guardar_lote(grupo, estrategia="3", subcarpeta=subcarpeta)
+        else:
+            ruta = guardar_lote(grupo, estrategia="3")
+        rutas.append(ruta)
+
+    return rutas
 
 
 # ─────────────────────────────────────────────────────────────

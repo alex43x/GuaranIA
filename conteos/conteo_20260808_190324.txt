@@ -1,0 +1,99 @@
+CONTEO DE REGISTROS
+======================================================================
+
+*** ESTRATEGIA 3 ***
+----------------------------------------------------------------------
+Archivos: 10
+--- (sin_seed) ---
+  educación                          15
+  salud                              35
+  Total (sin_seed)                   50
+--- americasnli.jsonl ---
+  vida cotidiana                      4
+  Total americasnli.jsonl             4
+--- belele.jsonl ---
+  ciencia                             5
+  cultura                             8
+  educación                           5
+  música                              5
+  tecnología                          5
+  Total belele.jsonl                 28
+--- flores-200.jsonl ---
+  deportes                            5
+  historia                            4
+  medio ambiente                      5
+  política                            4
+  salud                               5
+  tecnología                          4
+  Total flores-200.jsonl             27
+--- jojajovai.jsonl ---
+  deportes                           21
+  economía                           15
+  educación                          16
+  política                           13
+  salud                              16
+  Total jojajovai.jsonl              81
+
+  Total ESTRATEGIA 3                190
+
+*** ESTRATEGIA 5 ***
+----------------------------------------------------------------------
+Archivos pendientes: 103  |  Procesados por E3: 0
+
+  --- Pendientes ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    educación                           5
+    salud                               5
+    Total (sin_seed)                   10
+  --- americasnli.jsonl ---
+    economía                          120
+    familia                           120
+    política                          120
+    salud                             120
+    vida cotidiana                    120
+    Total americasnli.jsonl           600
+  --- belele.jsonl ---
+    ciencia                             5
+    cultura                             5
+    educación                           5
+    música                              5
+    tecnología                          5
+    Total belele.jsonl                 25
+  --- flores-200.jsonl ---
+    deportes                          270
+    historia                          270
+    medio ambiente                    270
+    política                          270
+    salud                             270
+    tecnología                        270
+    Total flores-200.jsonl           1620
+  --- jojajovai.jsonl ---
+    cultura                           140
+    deportes                          140
+    economía                          140
+    educación                         140
+    política                          140
+    salud                             140
+    Total jojajovai.jsonl             840
+  --- tatoeba.jsonl ---
+    clima                             190
+    comida                            190
+    familia                           190
+    tiempo libre                      190
+    vida cotidiana                    190
+    Total tatoeba.jsonl               950
+
+  --- Total pendientes                      4045
+
+  --- Ya procesados por Estrategia 3 ---
+  --------------------------------------------------------------------
+  (ninguno)
+
+  --- Total procesados                         0
+
+  Total ESTRATEGIA 5               4045
+
+======================================================================
+TOTAL GENERAL                    4235
+======================================================================
