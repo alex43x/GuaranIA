@@ -90,24 +90,24 @@ def transformar_oracion(oracion_base: str, client, tipo_cambio: str = "sinonimo"
 
     if tipo_cambio == "sinonimo":
         instruccion = (
-            "Reescribí esta oración en guaraní reemplazando SOLO la palabra o "
-            "expresión corta que realmente tenga un sinónimo natural en guaraní "
-            "— puede ser una palabra suelta o una expresión de dos o tres palabras "
-            "si esa es la unidad natural (por ejemplo, una locución o un verbo "
-            "compuesto). No reescribas la oración entera, no cambies la estructura, "
-            "no agregues ni quites información. Elegí el reemplazo que suene más "
-            "natural en guaraní, no fuerces un cambio si no hay un sinónimo real. "
-            "Devolvé solo la oración resultante. "
-            "Si no existe ningún reemplazo natural en esta oración, respondé "
-            "exactamente: SIN_VARIACION_POSIBLE"
+            "Reescribí esta oración en guaraní cambiando lo que realmente pueda "
+            "reemplazarse por un sinónimo o expresión equivalente — puede ser una "
+            "sola palabra, o una expresión corta si esa es la unidad de significado "
+            "real (por ejemplo, una locución que funciona como una sola idea). "
+            "No cambies nada que no tenga un sinónimo razonable, no agregues ni "
+            "quites contenido que no sea parte del reemplazo. Devolvé solo la "
+            "oración resultante. Si la oración es tan corta que no hay nada con "
+            "sinónimo razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
         )
     else:  # reordenar
         instruccion = (
-            "Reescribí esta oración en guaraní moviendo UN fragmento de lugar "
-            "(por ejemplo, el orden de una frase adverbial), sin cambiar el "
-            "significado ni agregar/quitar palabras. Devolvé solo la oración resultante. "
-            "Si la oración es tan corta o simple que no hay ningún reordenamiento "
-            "razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
+            "Reescribí esta oración en guaraní moviendo el fragmento que realmente "
+            "admita reordenarse sin romper el significado (por ejemplo, una frase "
+            "adverbial, un complemento, o el orden de una cláusula) — el tamaño de "
+            "ese fragmento depende de la oración, no tiene que ser una sola palabra. "
+            "No agregues ni quites palabras, solo cambiá el orden. Devolvé solo la "
+            "oración resultante. Si la oración es tan corta o simple que no hay "
+            "ningún reordenamiento razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
         )
 
     prompt = f"{instruccion}\n\nOración: {oracion_base}"

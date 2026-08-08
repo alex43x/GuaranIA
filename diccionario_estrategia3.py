@@ -125,17 +125,19 @@ def pedir_sinonimo_verbo_es(lema_original: str, client) -> str:
 
 
 def aplicar_diccionario(oracion: str, df_nouns: pd.DataFrame, df_verbs: pd.DataFrame,
-                          client, max_sinonimos: int = 3) -> list[tuple[str, str]]:
+                          client, max_reemplazos: int = 3) -> tuple[str | None, list[str]]:
     """
-    Busca TODAS las palabras de la oración que tengan match en el
-    diccionario (sustantivo o verbo), y genera hasta max_sinonimos
-    variantes — una por cada candidato real distinto, nunca más de
-    los que efectivamente existen. Devuelve lista de (variante, metodo),
-    puede tener 0 a max_sinonimos elementos.
+    Genera UNA oración con hasta max_reemplazos palabras cambiadas por
+    sinónimo SIMULTÁNEAMENTE (no una oración por cada reemplazo).
+    Nunca reemplaza más palabras de las que realmente tienen match en
+    el diccionario — si solo hay 1 candidato real, reemplaza 1, no 3.
+
+    Devuelve (oracion_nueva, metodos_usados) o (None, []) si no hubo
+    ningún candidato real.
     """
     palabras = oracion.split()
 
-    # 1. Encontrar TODOS los candidatos reales (no uno solo al azar)
+    # 1. Encontrar TODOS los candidatos reales de la oración
     candidatos = []
     for idx, palabra in enumerate(palabras):
         palabra_limpia = palabra.strip(".,;:!?¡¿'\"")
@@ -144,32 +146,35 @@ def aplicar_diccionario(oracion: str, df_nouns: pd.DataFrame, df_verbs: pd.DataF
             candidatos.append((idx, pos, fila, palabra_limpia))
 
     if not candidatos:
-        return []  # ningún candidato real — no se inventa nada
+        return None, []  # ningún candidato — no hay variante
 
-    random.shuffle(candidatos)  # variar cuál se prueba primero entre corridas
+    random.shuffle(candidatos)  # variar qué palabras se priorizan entre corridas
 
-    # 2. Generar variantes SOLO para candidatos que efectivamente den
-    #    un reemplazo válido — se corta apenas se llega a max_sinonimos
-    variantes = []
+    # 2. Reemplazar hasta max_reemplazos, todos en la MISMA oración
+    palabras_nuevas = palabras.copy()
+    metodos_usados = []
+
     for idx, pos, fila, palabra_limpia in candidatos:
-        if len(variantes) >= max_sinonimos:
+        if len(metodos_usados) >= max_reemplazos:
             break
 
         nuevo = None
         if pos == "sustantivo":
             nuevo = sinonimo_sustantivo(palabra_limpia, df_nouns)
-            metodo = "sustantivo_diccionario"
+            metodo = "sustantivo"
         else:  # verbo
             lema_nuevo = pedir_sinonimo_verbo_es(fila["espanol_lema"], client)
             nuevo = conjugar_verbo(lema_nuevo, fila["modo"], fila["tiempo"], fila["persona"], fila["numero"], df_verbs)
-            metodo = "verbo_diccionario_gramatical"
+            metodo = "verbo"
 
         if nuevo:
-            copia = palabras.copy()
-            copia[idx] = nuevo
-            variantes.append((" ".join(copia), metodo))
+            palabras_nuevas[idx] = nuevo
+            metodos_usados.append(metodo)
 
-    return variantes
+    if not metodos_usados:
+        return None, []  # había candidatos pero ninguno dio reemplazo válido
+
+    return " ".join(palabras_nuevas), metodos_usados
 
 
 # ─────────────────────────────────────────────────────────────
@@ -203,23 +208,23 @@ if __name__ == "__main__":
     df_nouns, df_verbs = cargar_diccionarios()
     print(f"Sustantivos: {len(df_nouns)} filas. Verbos: {len(df_verbs)} filas.")
 
-    print("\n=== Aplicando diccionario (hasta 3 sinónimos reales por oración) ===")
+    print("\n=== Aplicando diccionario (hasta 3 palabras con sinónimo, en la MISMA oración) ===")
     registros = []
     sin_candidatos = 0
     for item in oraciones:
-        variantes = aplicar_diccionario(item["texto"], df_nouns, df_verbs, client, max_sinonimos=3)
-        if not variantes:
+        texto_nuevo, metodos = aplicar_diccionario(item["texto"], df_nouns, df_verbs, client, max_reemplazos=3)
+        if texto_nuevo is None:
             sin_candidatos += 1
             continue
-        for texto_nuevo, metodo in variantes:
-            registros.append({
-                "texto": texto_nuevo,
-                "texto_base": item["texto"],
-                "tipo_transformacion": metodo,
-                "dominio": item.get("dominio", "sin_clasificar"),
-                "estrategia": "3",
-            })
+        registros.append({
+            "texto": texto_nuevo,
+            "texto_base": item["texto"],
+            "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
+            "detalle_reemplazos": metodos,  # ej. ["sustantivo", "verbo"] — qué tipo se cambió, en orden
+            "dominio": item.get("dominio", "sin_clasificar"),
+            "estrategia": "3",
+        })
 
-    print(f"\n{len(registros)} variantes generadas por diccionario "
-          f"({sin_candidatos} oraciones sin ningún candidato en el diccionario).")
+    print(f"\n{len(registros)} oraciones con al menos 1 reemplazo "
+          f"({sin_candidatos} sin ningún candidato en el diccionario).")
     guardar(registros)
