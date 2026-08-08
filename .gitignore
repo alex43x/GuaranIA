@@ -4,3 +4,4 @@ __pycache__/
 /seeds
 backups
 procesados
+.venv
