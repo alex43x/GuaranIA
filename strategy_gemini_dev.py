@@ -98,23 +98,42 @@ def armar_prompt(ejemplos: list[str], dominio: str) -> str:
 
 
 def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_dominio: int = 10, seed_file_name: str = "") -> tuple[str, list[str]]:
+    import time
     from google import genai
+    from google.genai.errors import ServerError
 
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
     if not api_key:
         raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
     client = genai.Client(api_key=api_key)
 
+    def generar_con_reintentos(prompt: str, max_reintentos: int = 4, espera_inicial: float = 5.0) -> str:
+        """Llama a la API con reintentos en caso de error 500 transitorio."""
+        for intento in range(1, max_reintentos + 1):
+            try:
+                response = client.models.generate_content(
+                    model="gemini-3.5-flash",
+                    contents=prompt,
+                )
+                return response.text.strip()
+            except ServerError as e:
+                if intento < max_reintentos:
+                    espera = espera_inicial * (2 ** (intento - 1))  # backoff exponencial
+                    print(f"  [Reintento {intento}/{max_reintentos - 1}] Error 500 de Gemini. Esperando {espera:.0f}s...")
+                    time.sleep(espera)
+                else:
+                    print(f"  [Error] Fallo tras {max_reintentos} intentos: {e}")
+                    raise
+
     registros = []
     prompts = []
+    total = len(dominios) * por_dominio
+    actual = 0
     for dominio in dominios:
         for _ in range(por_dominio):
+            actual += 1
             prompt = armar_prompt(ejemplos_few_shot, dominio)
-            response = client.models.generate_content(
-                model="gemini-3.5-flash",
-                contents=prompt,
-            )
-            texto_generado = response.text.strip()
+            texto_generado = generar_con_reintentos(prompt)
             registros.append({
                 "texto": texto_generado,
                 "dominio": dominio,
@@ -123,6 +142,7 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
                 "seed_file": seed_file_name,
             })
             prompts.append(prompt)
+            print(f"  [{actual}/{total}] dominio={dominio} ✓")
     ruta = guardar_lote(registros, estrategia="5")
     return ruta, prompts
 
