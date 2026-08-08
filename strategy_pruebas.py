@@ -205,7 +205,7 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
     for seed_file, grupo in agrupados.items():
         if seed_file:
             seed_stem = os.path.splitext(os.path.basename(seed_file))[0]
-            subcarpeta = os.path.join("estrategia3", seed_stem)
+            subcarpeta = os.path.join("estrategia3", seed_stem, "reordenar")
             ruta = guardar_lote(grupo, estrategia="3", subcarpeta=subcarpeta)
         else:
             ruta = guardar_lote(grupo, estrategia="3")

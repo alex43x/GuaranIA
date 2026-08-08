@@ -1,0 +1,49 @@
+CONTEO DE REGISTROS
+======================================================================
+
+*** ESTRATEGIA 3 ***
+----------------------------------------------------------------------
+Archivos: 0
+  (sin datos historicos)
+
+  Total ESTRATEGIA 3                  0
+
+*** ESTRATEGIA 5 ***
+----------------------------------------------------------------------
+Archivos commiteados: 6  |  Procesados por E3: 0
+
+  --- Archivos ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    educación                           5
+    salud                               5
+    Total (sin_seed)                   10
+  --- americasnli.jsonl ---
+    economía                           20
+    familia                            20
+    política                           20
+    salud                              20
+    vida cotidiana                     20
+    Total americasnli.jsonl           100
+  --- jojajovai.jsonl ---
+    cultura                             5
+    deportes                            5
+    economía                            5
+    educación                           5
+    política                            5
+    salud                               5
+    Total jojajovai.jsonl              30
+
+  --- Total commiteado                       140
+
+  --- Ya procesados por Estrategia 3 ---
+  --------------------------------------------------------------------
+  (ninguno)
+
+  --- Total procesados                         0
+
+  Total ESTRATEGIA 5                140
+
+======================================================================
+TOTAL GENERAL                     140
+======================================================================

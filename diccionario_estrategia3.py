@@ -28,7 +28,7 @@ load_dotenv()
 
 CARPETA_RAW_RAIZ = "raw"
 CARPETA_BASE_ESTRATEGIA5 = os.path.join("raw", "estrategia5")
-CARPETA_SALIDA = os.path.join("raw", "estrategia3_diccionario")
+CARPETA_BASE_E3 = os.path.join("raw", "estrategia3")
 
 RUTA_REPO_GRAMATICA = "../SyntaxGrammar-es-gn"
 RUTA_NOUNS = os.path.join(RUTA_REPO_GRAMATICA, "guarani/nouns/matched-nouns.csv")
@@ -729,18 +729,32 @@ def aplicar_diccionario(oracion: str, df_nouns: pd.DataFrame, df_verbs: pd.DataF
 # ─────────────────────────────────────────────────────────────
 # Guardar (carpeta propia, no se mezcla con raw/estrategia3/)
 # ─────────────────────────────────────────────────────────────
-def guardar(registros: list[dict]) -> str | None:
+def guardar(registros: list[dict]) -> list[str]:
     if not registros:
         print("Nada que guardar (0 registros) — no se crea archivo.")
-        return None
-    os.makedirs(CARPETA_SALIDA, exist_ok=True)
+        return []
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    ruta = os.path.join(CARPETA_SALIDA, f"lote_{timestamp}.jsonl")
-    with open(ruta, "w", encoding="utf-8") as f:
-        for reg in registros:
-            f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-    print(f"Guardado: {ruta} ({len(registros)} registros)")
-    return ruta
+    agrupados: dict[str, list[dict]] = {}
+    for reg in registros:
+        seed = reg.get("seed_file", "") or "(sin_seed)"
+        agrupados.setdefault(seed, []).append(reg)
+
+    rutas = []
+    for seed, grupo in agrupados.items():
+        if seed != "(sin_seed)":
+            seed_stem = os.path.splitext(os.path.basename(seed))[0]
+        else:
+            seed_stem = "(sin_seed)"
+        carpeta = os.path.join(CARPETA_BASE_E3, seed_stem, "sinonimo")
+        os.makedirs(carpeta, exist_ok=True)
+        ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
+        with open(ruta, "w", encoding="utf-8") as f:
+            for reg in grupo:
+                f.write(json.dumps(reg, ensure_ascii=False) + "\n")
+        print(f"Guardado: {ruta} ({len(grupo)} registros)")
+        rutas.append(ruta)
+    return rutas
 
 
 # ─────────────────────────────────────────────────────────────

@@ -67,7 +67,7 @@ def _formatear_tabla(conteo: dict, nivel: int = 0) -> tuple[str, int]:
 # ─── ESTRATEGIA 3 ───
 
 def seccion_estrategia_3() -> tuple[str, int]:
-    conteo, archivos = contar_estrategia(CARPETA_E3_RAW, excluir=["estrategia3_diccionario"])
+    conteo, archivos = contar_estrategia(CARPETA_E3_RAW)
     lineas = [
         f"\n*** ESTRATEGIA 3 ***",
         "-" * 70,
