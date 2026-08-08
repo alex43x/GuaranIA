@@ -26,7 +26,7 @@ def guardar_lote(registros: list[dict], estrategia: str) -> str:
     """Guarda el lote generado en raw/estrategia{N}/, separado por estrategia."""
     carpeta = os.path.join(CARPETA_RAW, f"estrategia{estrategia}")
     os.makedirs(carpeta, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")  # con segundos, para no pisarse en pruebas rápidas
     ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
     with open(ruta, "w", encoding="utf-8") as f:
         for reg in registros:
@@ -90,24 +90,24 @@ def transformar_oracion(oracion_base: str, client, tipo_cambio: str = "sinonimo"
 
     if tipo_cambio == "sinonimo":
         instruccion = (
-            "Reescribí esta oración en guaraní cambiando lo que realmente pueda "
-            "reemplazarse por un sinónimo o expresión equivalente — puede ser una "
-            "sola palabra, o una expresión corta si esa es la unidad de significado "
-            "real (por ejemplo, una locución que funciona como una sola idea). "
-            "No cambies nada que no tenga un sinónimo razonable, no agregues ni "
-            "quites contenido que no sea parte del reemplazo. Devolvé solo la "
-            "oración resultante. Si la oración es tan corta que no hay nada con "
-            "sinónimo razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
+            "Reescribí esta oración en guaraní reemplazando SOLO la palabra o "
+            "expresión corta que realmente tenga un sinónimo natural en guaraní "
+            "— puede ser una palabra suelta o una expresión de dos o tres palabras "
+            "si esa es la unidad natural (por ejemplo, una locución o un verbo "
+            "compuesto). No reescribas la oración entera, no cambies la estructura, "
+            "no agregues ni quites información. Elegí el reemplazo que suene más "
+            "natural en guaraní, no fuerces un cambio si no hay un sinónimo real. "
+            "Devolvé solo la oración resultante. "
+            "Si no existe ningún reemplazo natural en esta oración, respondé "
+            "exactamente: SIN_VARIACION_POSIBLE"
         )
     else:  # reordenar
         instruccion = (
-            "Reescribí esta oración en guaraní moviendo el fragmento que realmente "
-            "admita reordenarse sin romper el significado (por ejemplo, una frase "
-            "adverbial, un complemento, o el orden de una cláusula) — el tamaño de "
-            "ese fragmento depende de la oración, no tiene que ser una sola palabra. "
-            "No agregues ni quites palabras, solo cambiá el orden. Devolvé solo la "
-            "oración resultante. Si la oración es tan corta o simple que no hay "
-            "ningún reordenamiento razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
+            "Reescribí esta oración en guaraní moviendo UN fragmento de lugar "
+            "(por ejemplo, el orden de una frase adverbial), sin cambiar el "
+            "significado ni agregar/quitar palabras. Devolvé solo la oración resultante. "
+            "Si la oración es tan corta o simple que no hay ningún reordenamiento "
+            "razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
         )
 
     prompt = f"{instruccion}\n\nOración: {oracion_base}"
@@ -127,7 +127,13 @@ def transformar_oracion(oracion_base: str, client, tipo_cambio: str = "sinonimo"
     return resultado
 
 
-def generar_estrategia_3(oraciones_semilla: list[dict], variantes_por_semilla: int = 3):
+def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int = 4):
+    """
+    SOLO reordenación (el sinónimo ahora lo maneja el diccionario, en
+    diccionario_estrategia3.py). Intenta hasta max_reordenaciones
+    variantes distintas por oración — se detiene antes si dos intentos
+    seguidos no dan nada nuevo (sin inventar variantes que no existen).
+    """
     from google import genai
 
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
@@ -135,21 +141,35 @@ def generar_estrategia_3(oraciones_semilla: list[dict], variantes_por_semilla: i
         raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
     client = genai.Client(api_key=api_key)
 
-    tipos = ["sinonimo", "reordenar"]
     registros = []
-    fallidas = 0
     sin_variacion = 0
     for semilla in oraciones_semilla:
-        for i in range(variantes_por_semilla):
-            tipo = tipos[i % len(tipos)]  # alterna entre sinónimo y reordenar
-            variante = transformar_oracion(semilla["texto"], client, tipo_cambio=tipo)
+        variantes_vistas = []  # normalizadas, para no contar duplicados como "nueva variante"
+        intentos_sin_exito_seguidos = 0
+
+        for _ in range(max_reordenaciones):
+            variante = transformar_oracion(semilla["texto"], client, tipo_cambio="reordenar")
+
             if variante is None:
                 sin_variacion += 1
-                continue  # se omite: sin variación posible, no un error de API
+                intentos_sin_exito_seguidos += 1
+                if intentos_sin_exito_seguidos >= 2:
+                    break  # ya insistió 2 veces sin éxito, no hay más variación real
+                continue
+
+            clave = _normalizar_para_comparar(variante)
+            if clave in variantes_vistas:
+                intentos_sin_exito_seguidos += 1
+                if intentos_sin_exito_seguidos >= 2:
+                    break
+                continue  # repetida, no es una variante nueva
+
+            variantes_vistas.append(clave)
+            intentos_sin_exito_seguidos = 0
             registros.append({
                 "texto": variante,
                 "texto_base": semilla["texto"],
-                "tipo_transformacion": tipo,
+                "tipo_transformacion": "reordenar",
                 "dominio": semilla.get("dominio", "sin_clasificar"),
                 "estrategia": "3",
             })
