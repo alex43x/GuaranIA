@@ -1,10 +1,10 @@
 """
 DATA WRANGLER — Pipeline completo de filtrado, validación y carga a Google Sheets
 ==================================================================================
-FASE 1: raw/ -> validación morfológica -> Sheets (pestañas estrategia_3 / estrategia_5)
+FASE 1: raw/ -> análisis LLM -> Sheets (pestañas estrategia_3 / estrategia_5)
 FASE 3: Sheets -> clasificación -> dataset_acumulado_estrategia{3,5}.jsonl / feedback / rechazados
 
-Requisitos: pip install gspread google-auth gradio_client
+Requisitos: pip install gspread google-auth gradio_client requests
 Necesita: credenciales.json (Cuenta de Servicio de Google Cloud)
 """
 
@@ -32,14 +32,18 @@ def _ruta_acumulado(estrategia: str) -> str:
 def _ruta_dorados(estrategia: str) -> str:
     return f"feedback/estrategia{estrategia}/dorados.jsonl"
 
-def _ruta_para_regenerar(estrategia: str) -> str:
-    return f"feedback/estrategia{estrategia}/para_regenerar.jsonl"
+def _ruta_para_regenerar_grupo(estrategia: str, seed_file: str, dominio: str, ts: str) -> str:
+    seed_nombre = os.path.splitext(os.path.basename(seed_file))[0] if seed_file else "sin_seed"
+    carpeta = f"feedback/estrategia{estrategia}"
+    os.makedirs(carpeta, exist_ok=True)
+    return f"{carpeta}/para_regenerar_{seed_nombre}_{dominio}_{ts}.jsonl"
 
 CAMPOS_REQUERIDOS = ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia"]
 COLUMNAS_E3 = ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia",
-               "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error"]
+               "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error", "posibles_errores"]
 COLUMNAS_E5 = ["texto", "dominio", "estrategia", "prompt",
-               "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error"]
+               "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error",
+               "posibles_errores", "seed_file"]
 
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -47,6 +51,7 @@ SCOPES = [
 ]
 
 VALIDACION_MORFOLOGICA = False  # Cambiar a cuando se quiera aplicar API externa para correciones con morfologia
+ANALIZAR_ERRORES_LLM = True     # Analizar oraciones con LLM local antes de subir al Sheet
 
 # ─── HELPERS ───
 
@@ -100,10 +105,17 @@ def conectar_a_pestana(nombre_pestana: str, columnas: list[str], crear_si_no_exi
         if not primera_fila:
             pestana.append_row(columnas)
             print(f"   Pestaña '{nombre_pestana}' existía vacía, cabeceras escritas.")
+        else:
+            faltantes = [c for c in columnas if c not in primera_fila]
+            if faltantes:
+                for col in faltantes:
+                    pestana.update_cell(1, len(primera_fila) + 1, col)
+                    primera_fila.append(col)
+                print(f"   Pestaña '{nombre_pestana}': columnas agregadas: {faltantes}")
         return pestana
     except gspread.exceptions.WorksheetNotFound:
         if crear_si_no_existe:
-            pestana = hoja.add_worksheet(title=nombre_pestana, rows="1000", cols="10")
+            pestana = hoja.add_worksheet(title=nombre_pestana, rows="1000", cols="12")
             pestana.append_row(columnas)
             print(f"   Pestaña '{nombre_pestana}' creada con cabeceras.")
             return pestana
@@ -185,6 +197,7 @@ def formatear_filas_e3(registros: list[dict]) -> list[list]:
             reg.get("dominio", ""),
             reg.get("estrategia", ""),
             "", "", "", "",
+            reg.get("posibles_errores", ""),
         ]
         filas.append(fila)
     return filas
@@ -199,6 +212,8 @@ def formatear_filas_e5(registros: list[dict]) -> list[list]:
             reg.get("estrategia", ""),
             reg.get("prompt", ""),
             "", "", "", "",
+            reg.get("posibles_errores", ""),
+            reg.get("seed_file", ""),
         ]
         filas.append(fila)
     return filas
@@ -287,6 +302,30 @@ def fase1_subir():
         registros_validados = registros_filtrados
         print("[Wrangler] Validación morfológica DESACTIVADA (VALIDACION_MORFOLOGICA=False).")
 
+    if ANALIZAR_ERRORES_LLM:
+        from analizador_errores import analizar_oracion, parsear_respuesta, conectar_llm
+        print(f"\n[Wrangler] Analizando errores con LLM local ({len(registros_validados)} registros)...")
+        conectar_llm()
+        import time as _time
+        errores_encontrados = 0
+        for i, reg in enumerate(registros_validados):
+            texto = reg.get("texto", "")
+            try:
+                respuesta = analizar_oracion(texto)
+                errores = parsear_respuesta(respuesta)
+                errores = errores.strip().replace('\n', ' | ').replace('\\n', ' | ')
+                if len(errores) > 300:
+                    errores = errores[:297] + '...'
+                reg["posibles_errores"] = errores
+                if errores and errores != "sin errores":
+                    errores_encontrados += 1
+            except Exception as e:
+                reg["posibles_errores"] = f"ERROR_API: {e}"
+            if (i + 1) % 5 == 0 or i == len(registros_validados) - 1:
+                print(f"   Progreso: {i + 1}/{len(registros_validados)}")
+            _time.sleep(1)
+        print(f"[Wrangler] Análisis LLM completado: {errores_encontrados}/{len(registros_validados)} con errores detectados.")
+
     e3, e5 = clasificar_por_estrategia(registros_validados)
     print(f"\n[Wrangler] Estrategia 3: {len(e3)} | Estrategia 5: {len(e5)}")
 
@@ -328,144 +367,200 @@ def _parsear_puntaje(valor) -> int | None:
         return None
 
 
-def _pintar_filas_procesadas(pestana, num_columnas, filas_procesadas):
-    if not filas_procesadas:
-        return
-    ultima_col = chr(ord("A") + num_columnas - 1)
-    formato = {"backgroundColor": {"red": 1.0, "green": 0.75, "blue": 0.4}}
-    for num in filas_procesadas:
-        pestana.format(f"A{num}:{ultima_col}{num}", formato)
-    print(f"   L {len(filas_procesadas)} filas pintadas de naranja OK")
-
-
-def _pintar_filas_doradas(pestana, num_columnas, filas_doradas):
-    if not filas_doradas:
-        return
-    ultima_col = chr(ord("A") + num_columnas - 1)
-    formato = {"backgroundColor": {"red": 1.0, "green": 0.95, "blue": 0.55}}
-    for num in filas_doradas:
-        pestana.format(f"A{num}:{ultima_col}{num}", formato)
-    print(f"   L {len(filas_doradas)} doradas pintadas de amarillo **")
-
-
-def fase3_clasificar():
+def fase3_clasificar(dry_run: bool = False):
     print("=" * 60)
-    print("FASE 3: Sheets -> clasificación (acumulado / para_regenerar)")
+    modo = " (DRY RUN)" if dry_run else ""
+    print(f"FASE 3: Sheets -> clasificación (acumulado / para_regenerar){modo}")
     print("=" * 60)
 
     asegurar_carpetas()
 
     aprobados = []
     dorados = []
-    para_regenerar = []
+    por_regenerar = {}  # (seed_file, dominio) -> list[dict]
     pendientes = 0
+    ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    for nombre_tab in [TAB_E3, TAB_E5]:
-        try:
-            pestana = conectar_a_pestana(nombre_tab, [], crear_si_no_existe=False)
-        except gspread.exceptions.WorksheetNotFound:
-            print(f"[Wrangler] Pestaña '{nombre_tab}' no existe, se saltea.")
+    nombre_tab = TAB_E5
+    try:
+        pestana = conectar_a_pestana(nombre_tab, [], crear_si_no_existe=False)
+    except gspread.exceptions.WorksheetNotFound:
+        print(f"[Wrangler] Pestaña '{nombre_tab}' no existe.")
+        return
+
+    filas = pestana.get_all_values()
+    print(f"\n[Wrangler] Leyendo '{nombre_tab}': {len(filas)} filas (incluyendo cabecera).")
+
+    if len(filas) <= 1:
+        print(f"   Sin datos para procesar.")
+        return
+
+    cabecera = [c.strip().lower() for c in filas[0]]
+    idx_correccion = cabecera.index("correccion") if "correccion" in cabecera else -1
+    idx_sintaxis = cabecera.index("puntaje_sintaxis") if "puntaje_sintaxis" in cabecera else -1
+    idx_semantica = cabecera.index("puntaje_semantica") if "puntaje_semantica" in cabecera else -1
+    idx_tipo_error = cabecera.index("tipo_error") if "tipo_error" in cabecera else -1
+
+    for i, fila in enumerate(filas[1:], start=2):
+        if len(fila) < 2:
             continue
 
-        filas = pestana.get_all_values()
-        print(f"\n[Wrangler] Leyendo '{nombre_tab}': {len(filas)} filas (incluyendo cabecera).")
+        registro = {}
+        for j, valor in enumerate(fila):
+            if j < len(cabecera):
+                registro[cabecera[j]] = valor.strip()
 
-        if len(filas) <= 1:
-            print(f"   Sin datos para procesar.")
+        seed_file = registro.get("seed_file", "")
+        dominio = registro.get("dominio", "sin_dominio")
+        prompt = registro.get("prompt", "")
+
+        correccion = fila[idx_correccion].strip() if idx_correccion >= 0 and len(fila) > idx_correccion else ""
+        tipo_error = fila[idx_tipo_error].strip() if idx_tipo_error >= 0 and len(fila) > idx_tipo_error else ""
+        puntaje_sintaxis = _parsear_puntaje(fila[idx_sintaxis] if idx_sintaxis >= 0 and len(fila) > idx_sintaxis else None)
+        puntaje_semantica = _parsear_puntaje(fila[idx_semantica] if idx_semantica >= 0 and len(fila) > idx_semantica else None)
+
+        if correccion:
+            registro["correccion"] = correccion
+            if tipo_error:
+                registro["tipo_error"] = tipo_error
+            key = (seed_file, dominio)
+            if key not in por_regenerar:
+                por_regenerar[key] = {"oraciones": [], "prompt": prompt}
+            por_regenerar[key]["oraciones"].append(registro)
             continue
 
-        cabecera = [c.strip().lower() for c in filas[0]]
-        idx_correccion = cabecera.index("correccion") if "correccion" in cabecera else -1
-        idx_sintaxis = cabecera.index("puntaje_sintaxis") if "puntaje_sintaxis" in cabecera else -1
-        idx_semantica = cabecera.index("puntaje_semantica") if "puntaje_semantica" in cabecera else -1
-        idx_tipo_error = cabecera.index("tipo_error") if "tipo_error" in cabecera else -1
+        if puntaje_sintaxis is None or puntaje_semantica is None:
+            pendientes += 1
+            continue
 
-        filas_procesadas = []
-        filas_doradas = []
-
-        for i, fila in enumerate(filas[1:], start=2):
-            if len(fila) < 2:
-                continue
-
-            registro = {"estrategia": "3" if nombre_tab == TAB_E3 else "5"}
-
-            for j, valor in enumerate(fila):
-                if j < len(cabecera):
-                    registro[cabecera[j]] = valor.strip()
-
-            correccion = fila[idx_correccion].strip() if idx_correccion >= 0 and len(fila) > idx_correccion else ""
-            tipo_error = fila[idx_tipo_error].strip() if idx_tipo_error >= 0 and len(fila) > idx_tipo_error else ""
-            puntaje_sintaxis = _parsear_puntaje(fila[idx_sintaxis] if idx_sintaxis >= 0 and len(fila) > idx_sintaxis else None)
-            puntaje_semantica = _parsear_puntaje(fila[idx_semantica] if idx_semantica >= 0 and len(fila) > idx_semantica else None)
-
-            if correccion:
-                registro["correccion"] = correccion
-                if tipo_error:
-                    registro["tipo_error"] = tipo_error
-                para_regenerar.append(registro)
-                filas_procesadas.append(i)
-                continue
-
-            if puntaje_sintaxis is None or puntaje_semantica is None:
-                pendientes += 1
-                continue
-
-            filas_procesadas.append(i)
-            if puntaje_sintaxis == 5 and puntaje_semantica == 5:
-                aprobados.append(registro)
-                dorados.append(registro)
-                filas_doradas.append(i)
-            else:
-                registro["puntaje_sintaxis"] = puntaje_sintaxis
-                registro["puntaje_semantica"] = puntaje_semantica
-                if tipo_error:
-                    registro["tipo_error"] = tipo_error
-                para_regenerar.append(registro)
-
-        _pintar_filas_procesadas(pestana, len(cabecera), filas_procesadas)
-        _pintar_filas_doradas(pestana, len(cabecera), filas_doradas)
+        if puntaje_sintaxis == 5 and puntaje_semantica == 5:
+            registro["puntaje_sintaxis"] = puntaje_sintaxis
+            registro["puntaje_semantica"] = puntaje_semantica
+            aprobados.append(registro)
+            dorados.append(registro)
+        else:
+            registro["puntaje_sintaxis"] = puntaje_sintaxis
+            registro["puntaje_semantica"] = puntaje_semantica
+            if tipo_error:
+                registro["tipo_error"] = tipo_error
+            key = (seed_file, dominio)
+            if key not in por_regenerar:
+                por_regenerar[key] = {"oraciones": [], "prompt": prompt}
+            por_regenerar[key]["oraciones"].append(registro)
 
     print(f"\n[Wrangler] Resultado de clasificación:")
     print(f"   Aprobados (5/5):  {len(aprobados)}")
     print(f"   Dorados (5/5):    {len(dorados)}")
-    print(f"   Para regenerar:   {len(para_regenerar)}")
+    total_para_regenerar = sum(len(g["oraciones"]) for g in por_regenerar.values())
+    print(f"   Para regenerar:   {total_para_regenerar} (en {len(por_regenerar)} grupos)")
     if pendientes > 0:
         print(f"   Pendientes (sin revisar): {pendientes}")
 
-    def _agrupar_por_estrategia(registros):
-        grupos = {}
-        for reg in registros:
-            e = reg.get("estrategia", "desconocida")
-            grupos.setdefault(e, []).append(reg)
-        return grupos
-
     if aprobados:
-        for estrategia, regs in _agrupar_por_estrategia(aprobados).items():
-            ruta = _ruta_acumulado(estrategia)
+        ruta = _ruta_acumulado("5")
+        if dry_run:
+            print(f"   [+] {len(aprobados)} aprobados -> '{ruta}' (no escrito)")
+        else:
             with open(ruta, "a", encoding="utf-8") as f:
-                for reg in regs:
+                for reg in aprobados:
                     f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-            print(f"   [+] {len(regs)} aprobados (E{estrategia}) -> '{ruta}'.")
+            print(f"   [+] {len(aprobados)} aprobados -> '{ruta}'.")
 
     if dorados:
-        for estrategia, regs in _agrupar_por_estrategia(dorados).items():
-            ruta = _ruta_dorados(estrategia)
+        ruta = _ruta_dorados("5")
+        if dry_run:
+            print(f"   [+] {len(dorados)} dorados -> '{ruta}' (no escrito)")
+        else:
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
             with open(ruta, "w", encoding="utf-8") as f:
-                for reg in regs:
+                for reg in dorados:
                     f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-            print(f"   [+] {len(regs)} dorados (E{estrategia}) -> '{ruta}'.")
+            print(f"   [+] {len(dorados)} dorados -> '{ruta}'.")
 
-    if para_regenerar:
-        for estrategia, regs in _agrupar_por_estrategia(para_regenerar).items():
-            ruta = _ruta_para_regenerar(estrategia)
-            os.makedirs(os.path.dirname(ruta), exist_ok=True)
+    for (seed_file, dominio), grupo in por_regenerar.items():
+        ruta = _ruta_para_regenerar_grupo("5", seed_file, dominio, ts)
+        salida = {
+            "seed_file": seed_file,
+            "dominio": dominio,
+            "prompt": grupo.get("prompt", ""),
+            "total": len(grupo["oraciones"]),
+            "oraciones": [
+                {
+                    "texto": reg.get("texto", ""),
+                    "correccion": reg.get("correccion", ""),
+                    "tipo_error": reg.get("tipo_error", ""),
+                }
+                for reg in grupo["oraciones"]
+            ],
+        }
+        if dry_run:
+            print(f"   [+] {len(grupo['oraciones'])} para regenerar ({seed_file}/{dominio}) -> '{ruta}' (no escrito)")
+        else:
             with open(ruta, "w", encoding="utf-8") as f:
-                for reg in regs:
-                    f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-            print(f"   [+] {len(regs)} para regenerar (E{estrategia}) -> '{ruta}'.")
+                f.write(json.dumps(salida, ensure_ascii=False) + "\n")
+            print(f"   [+] {len(grupo['oraciones'])} para regenerar ({seed_file}/{dominio}) -> '{ruta}'.")
 
     print("\n[OK] FASE 3 COMPLETADA.")
+
+# ─── LIMPIEZA DE posibles_errores EN EL SHEET ───
+
+SANITIZAR_ERRORES_MAX_LEN = 300
+
+def _sanitizar_errores(texto: str) -> str:
+    t = texto.strip()
+    if '"errores"' in t:
+        try:
+            data = json.loads(t)
+            t = data.get("errores", t)
+        except (json.JSONDecodeError, KeyError):
+            inicio = t.find('"errores": "')
+            if inicio != -1:
+                t = t[inicio + len('"errores": "'):]
+                fin = t.rfind('"}')
+                if fin != -1:
+                    t = t[:fin]
+    t = t.replace("\\'", "'").replace("\\n", " | ").replace('\\"', '"')
+    t = t.replace('\n', ' | ')
+    if len(t) > SANITIZAR_ERRORES_MAX_LEN:
+        t = t[:SANITIZAR_ERRORES_MAX_LEN - 3] + '...'
+    return t.strip()
+
+
+def limpiar_sheet():
+    print("=" * 60)
+    print("LIMPIEZA: sanitizando columna 'posibles_errores' en el Sheet")
+    print("=" * 60)
+
+    limpiadas = 0
+    for nombre_tab in [TAB_E3, TAB_E5]:
+        try:
+            pestana = conectar_a_pestana(nombre_tab, [], crear_si_no_existe=False)
+        except gspread.exceptions.WorksheetNotFound:
+            continue
+
+        cabecera = pestana.row_values(1)
+        if "posibles_errores" not in cabecera:
+            print(f"   [!] '{nombre_tab}' no tiene columna 'posibles_errores'.")
+            continue
+
+        idx = cabecera.index("posibles_errores")
+        print(f"   '{nombre_tab}': sanitizando...")
+        filas = pestana.get_all_values()
+
+        for i, fila in enumerate(filas[1:], start=2):
+            if len(fila) <= idx:
+                continue
+            original = fila[idx]
+            if not original:
+                continue
+            limpio = _sanitizar_errores(original)
+            if limpio != original:
+                pestana.update_cell(i, idx + 1, limpio)
+                limpiadas += 1
+
+    print(f"   Celdas sanitizadas: {limpiadas}")
+    print("[OK] LIMPIEZA COMPLETADA.")
+
 
 # ─── MAIN ───
 
@@ -479,12 +574,16 @@ def main():
         print("Ejecutar FASE 1 (subir) o FASE 3 (clasificar)?")
         print("  1 - FASE 1: raw/ -> Sheets (validación + carga)")
         print("  3 - FASE 3: Sheets -> archivos locales (clasificación)")
+        print("  4 - LIMPIEZA: sanitizar columna 'posibles_errores'")
         fase = input("> ").strip()
 
     if fase == "1":
         fase1_subir()
     elif fase == "3":
-        fase3_clasificar()
+        dry = "--dry-run" in sys.argv
+        fase3_clasificar(dry_run=dry)
+    elif fase == "4":
+        limpiar_sheet()
     else:
         print(f"Fase '{fase}' no reconocida. Usá: python data_wrangler.py 1  o  python data_wrangler.py 3")
 
