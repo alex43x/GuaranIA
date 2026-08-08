@@ -32,6 +32,7 @@ CARPETA_SALIDA = os.path.join("raw", "estrategia3_diccionario")
 RUTA_REPO_GRAMATICA = "../SyntaxGrammar-es-gn"
 RUTA_NOUNS = os.path.join(RUTA_REPO_GRAMATICA, "guarani/nouns/matched-nouns.csv")
 RUTA_VERBS = os.path.join(RUTA_REPO_GRAMATICA, "guarani/verbs/matched-verbs-guarani.csv")
+RUTA_ADJ = os.path.join(RUTA_REPO_GRAMATICA, "guarani/adjectives/matched-adjectives-guarani.csv")
 
 COLUMNAS_NOUNS = ["guarani", "espanol_forma", "espanol_lema", "pos", "subpos", "genero", "numero"]
 COLUMNAS_VERBS = [
@@ -39,6 +40,10 @@ COLUMNAS_VERBS = [
     "clusividad", "reg", "transitividad", "c1", "c2",
     "espanol_forma", "espanol_lema", "pos2", "subpos2", "modo2", "tiempo2",
     "persona2", "numero2", "c3", "transitividad2", "c4", "c5",
+]
+COLUMNAS_ADJ = [
+    "guarani", "guarani_forma2", "pos", "subpos", "espanol_forma", "espanol_lema",
+    "pos2", "subpos2", "c1", "genero", "numero", "c2", "c3",
 ]
 
 
@@ -65,6 +70,7 @@ def leer_base_estrategia5() -> list[dict]:
 # ─────────────────────────────────────────────────────────────
 def cargar_diccionarios():
     df_nouns = pd.read_csv(RUTA_NOUNS, header=None, names=COLUMNAS_NOUNS, encoding="utf-8")
+    df_adj = pd.read_csv(RUTA_ADJ, header=None, names=COLUMNAS_ADJ, encoding="utf-8")
 
     try:
         df_verbs = pd.read_csv(RUTA_VERBS, header=None, names=COLUMNAS_VERBS, encoding="utf-8")
@@ -78,28 +84,95 @@ def cargar_diccionarios():
             engine="python", on_bad_lines="warn",
         )
 
-    return df_nouns, df_verbs
+    return df_nouns, df_verbs, df_adj
 
 
-def buscar_pos(palabra: str, df_nouns: pd.DataFrame, df_verbs: pd.DataFrame):
+def calcular_palabras_ambiguas(df_nouns: pd.DataFrame, df_verbs: pd.DataFrame, df_adj: pd.DataFrame) -> set:
+    """
+    Palabras guaraní que aparecen en MÁS DE UNA tabla (sustantivo Y
+    adjetivo, sustantivo Y verbo, etc.) — resuelve ambigüedades tipo
+    'guasu' (venado / aumentativo 'grande') sin gastar ni un llamado
+    a la IA: si es ambigua, directamente no se toca.
+    """
+    nouns_set = set(df_nouns["guarani"])
+    verbs_set = set(df_verbs["guarani_forma"])
+    adj_set = set(df_adj["guarani"])
+    return (nouns_set & verbs_set) | (nouns_set & adj_set) | (verbs_set & adj_set)
+
+
+def buscar_pos(palabra: str, df_nouns: pd.DataFrame, df_verbs: pd.DataFrame, df_adj: pd.DataFrame,
+                palabras_ambiguas: set):
+    if palabra in palabras_ambiguas:
+        return None, None  # ambigua entre tablas — no se toca, sin gastar API para decidir
+
     en_nouns = df_nouns[df_nouns["guarani"] == palabra]
     if not en_nouns.empty:
         return "sustantivo", en_nouns.iloc[0]
     en_verbs = df_verbs[df_verbs["guarani_forma"] == palabra]
     if not en_verbs.empty:
         return "verbo", en_verbs.iloc[0]
+    en_adj = df_adj[df_adj["guarani"] == palabra]
+    if not en_adj.empty:
+        return "adjetivo", en_adj.iloc[0]
     return None, None
 
 
-def sinonimo_sustantivo(palabra: str, df_nouns: pd.DataFrame) -> str | None:
+def _normalizar_para_comparar(texto: str) -> str:
+    import re
+    t = texto.lower().strip()
+    t = re.sub(r"[.,;:!?¡¿'\"]", "", t)
+    t = re.sub(r"\s+", " ", t)
+    return t
+
+
+def sinonimo_sustantivo(palabra: str, df_nouns: pd.DataFrame, excluir: set | None = None) -> str | None:
+    excluir = excluir or set()
     fila = df_nouns[df_nouns["guarani"] == palabra]
     if fila.empty:
         return None
     lema = fila.iloc[0]["espanol_lema"]
-    candidatos = df_nouns[(df_nouns["espanol_lema"] == lema) & (df_nouns["guarani"] != palabra)]
+    candidatos = df_nouns[
+        (df_nouns["espanol_lema"] == lema) & (~df_nouns["guarani"].isin({palabra} | excluir))
+    ]
     if candidatos.empty:
         return None
     return candidatos.sample(1).iloc[0]["guarani"]
+
+
+def contar_alternativas_sustantivo(palabra: str, df_nouns: pd.DataFrame) -> int:
+    """Cuántos sinónimos distintos existen realmente para esta palabra — usado para priorizar."""
+    fila = df_nouns[df_nouns["guarani"] == palabra]
+    if fila.empty:
+        return 0
+    lema = fila.iloc[0]["espanol_lema"]
+    return df_nouns[(df_nouns["espanol_lema"] == lema) & (df_nouns["guarani"] != palabra)]["guarani"].nunique()
+
+
+def sinonimo_adjetivo(palabra: str, df_adj: pd.DataFrame, excluir: set | None = None) -> str | None:
+    """
+    El guaraní de esta tabla es invariable en género/número (una sola
+    forma cubre las 4 combinaciones del español) — no hace falta
+    concordancia al elegir el reemplazo, a diferencia de sustantivos.
+    """
+    excluir = excluir or set()
+    fila = df_adj[df_adj["guarani"] == palabra]
+    if fila.empty:
+        return None
+    lema = fila.iloc[0]["espanol_lema"]
+    candidatos = df_adj[
+        (df_adj["espanol_lema"] == lema) & (~df_adj["guarani"].isin({palabra} | excluir))
+    ]
+    if candidatos.empty:
+        return None
+    return candidatos.sample(1).iloc[0]["guarani"]
+
+
+def contar_alternativas_adjetivo(palabra: str, df_adj: pd.DataFrame) -> int:
+    fila = df_adj[df_adj["guarani"] == palabra]
+    if fila.empty:
+        return 0
+    lema = fila.iloc[0]["espanol_lema"]
+    return df_adj[(df_adj["espanol_lema"] == lema) & (df_adj["guarani"] != palabra)]["guarani"].nunique()
 
 
 def conjugar_verbo(lema_es: str, modo, tiempo, persona, numero, df_verbs: pd.DataFrame) -> str | None:
@@ -124,57 +197,119 @@ def pedir_sinonimo_verbo_es(lema_original: str, client) -> str:
     return response.text.strip().lower()
 
 
-def aplicar_diccionario(oracion: str, df_nouns: pd.DataFrame, df_verbs: pd.DataFrame,
-                          client, max_reemplazos: int = 3) -> tuple[str | None, list[str]]:
-    """
-    Genera UNA oración con hasta max_reemplazos palabras cambiadas por
-    sinónimo SIMULTÁNEAMENTE (no una oración por cada reemplazo).
-    Nunca reemplaza más palabras de las que realmente tienen match en
-    el diccionario — si solo hay 1 candidato real, reemplaza 1, no 3.
+import re
 
-    Devuelve (oracion_nueva, metodos_usados) o (None, []) si no hubo
-    ningún candidato real.
+
+def _separar_puntuacion(palabra: str) -> tuple[str, str, str]:
+    """Separa una palabra en (prefijo de puntuación, núcleo, sufijo de puntuación),
+    para poder buscar/reemplazar el núcleo sin perder la puntuación pegada."""
+    m = re.match(r"^([¡¿'\"]*)(.*?)([.,;:!?'\"]*)$", palabra)
+    return m.group(1), m.group(2), m.group(3)
+
+
+def aplicar_diccionario(oracion: str, df_nouns: pd.DataFrame, df_verbs: pd.DataFrame, df_adj: pd.DataFrame,
+                          palabras_ambiguas: set, client,
+                          max_reemplazos: int = 3, max_variantes: int = 2) -> list[tuple[str, list[str]]]:
+    """
+    Reglas de negocio:
+    - Palabras ambiguas (aparecen en más de una tabla POS, ej. 'guasu')
+      NUNCA son candidatas — se descartan gratis, sin llamar a la IA.
+    - Si la oración tiene MENOS de 2 candidatos reales (ya sin
+      ambiguas), se ignora entera.
+    - Los candidatos se priorizan por "riqueza" (cuántos sinónimos
+      alternativos existen realmente para esa palabra) — se usan
+      primero los que tienen más opciones. Sustantivos y adjetivos
+      tienen riqueza calculable directo del diccionario; los verbos
+      quedan en 0 (no se puede saber sin llamar a Gemini por cada uno).
+    - Hasta max_variantes oraciones de salida, cada una con hasta
+      max_reemplazos palabras cambiadas A LA VEZ. Cada variante evita
+      repetir un sinónimo ya usado en esa misma palabra (sustantivo,
+      adjetivo Y verbo), Y evita coincidir exactamente con la oración
+      original — si un intento no cambia nada de verdad, no cuenta.
+    - Se preserva la puntuación pegada a la palabra (ej. el punto
+      final de una oración) — se reemplaza solo el núcleo, no el
+      signo de puntuación.
+
+    Devuelve lista de (oracion_nueva, metodos_usados), 0 a max_variantes elementos.
     """
     palabras = oracion.split()
+    clave_original = _normalizar_para_comparar(oracion)
 
-    # 1. Encontrar TODOS los candidatos reales de la oración
+    # 1. Encontrar candidatos reales — buscar_pos ya descarta ambiguas solo
     candidatos = []
     for idx, palabra in enumerate(palabras):
-        palabra_limpia = palabra.strip(".,;:!?¡¿'\"")
-        pos, fila = buscar_pos(palabra_limpia, df_nouns, df_verbs)
-        if pos:
-            candidatos.append((idx, pos, fila, palabra_limpia))
-
-    if not candidatos:
-        return None, []  # ningún candidato — no hay variante
-
-    random.shuffle(candidatos)  # variar qué palabras se priorizan entre corridas
-
-    # 2. Reemplazar hasta max_reemplazos, todos en la MISMA oración
-    palabras_nuevas = palabras.copy()
-    metodos_usados = []
-
-    for idx, pos, fila, palabra_limpia in candidatos:
-        if len(metodos_usados) >= max_reemplazos:
-            break
-
-        nuevo = None
+        _, nucleo, _ = _separar_puntuacion(palabra)
+        pos, fila = buscar_pos(nucleo, df_nouns, df_verbs, df_adj, palabras_ambiguas)
+        if not pos:
+            continue
         if pos == "sustantivo":
-            nuevo = sinonimo_sustantivo(palabra_limpia, df_nouns)
-            metodo = "sustantivo"
-        else:  # verbo
-            lema_nuevo = pedir_sinonimo_verbo_es(fila["espanol_lema"], client)
-            nuevo = conjugar_verbo(lema_nuevo, fila["modo"], fila["tiempo"], fila["persona"], fila["numero"], df_verbs)
-            metodo = "verbo"
+            riqueza = contar_alternativas_sustantivo(nucleo, df_nouns)
+        elif pos == "adjetivo":
+            riqueza = contar_alternativas_adjetivo(nucleo, df_adj)
+        else:
+            riqueza = 0
+        candidatos.append({"idx": idx, "pos": pos, "fila": fila, "palabra": nucleo, "riqueza": riqueza})
 
-        if nuevo:
-            palabras_nuevas[idx] = nuevo
-            metodos_usados.append(metodo)
+    if len(candidatos) < 2:
+        return []  # se ignora: no vale la pena con 1 solo candidato
 
-    if not metodos_usados:
-        return None, []  # había candidatos pero ninguno dio reemplazo válido
+    # 2. Priorizar por riqueza (más alternativas primero)
+    candidatos.sort(key=lambda c: c["riqueza"], reverse=True)
+    candidatos_a_usar = candidatos[:max_reemplazos]
 
-    return " ".join(palabras_nuevas), metodos_usados
+    # 3. Generar hasta max_variantes oraciones, evitando repetir sinónimo por palabra
+    variantes = []
+    sinonimos_usados_por_idx = {}
+
+    for _ in range(max_variantes):
+        palabras_nuevas = palabras.copy()
+        metodos = []
+
+        for c in candidatos_a_usar:
+            usados = sinonimos_usados_por_idx.get(c["idx"], set())
+            prefijo, nucleo_original, sufijo = _separar_puntuacion(palabras[c["idx"]])
+
+            if c["pos"] == "sustantivo":
+                nuevo = sinonimo_sustantivo(c["palabra"], df_nouns, excluir=usados)
+                metodo = "sustantivo"
+            elif c["pos"] == "adjetivo":
+                nuevo = sinonimo_adjetivo(c["palabra"], df_adj, excluir=usados)
+                metodo = "adjetivo"
+            else:  # verbo
+                intentos_verbo = 0
+                nuevo = None
+                while intentos_verbo < 3:  # hasta 3 intentos de conseguir un sinónimo NO repetido
+                    lema_nuevo = pedir_sinonimo_verbo_es(c["fila"]["espanol_lema"], client)
+                    candidato_verbo = conjugar_verbo(
+                        lema_nuevo, c["fila"]["modo"], c["fila"]["tiempo"], c["fila"]["persona"], c["fila"]["numero"], df_verbs
+                    )
+                    intentos_verbo += 1
+                    if candidato_verbo and candidato_verbo not in usados and candidato_verbo != nucleo_original:
+                        nuevo = candidato_verbo
+                        break
+                metodo = "verbo"
+
+            # No aceptar si el "reemplazo" es igual a la palabra original —
+            # eso no es un cambio real, aunque técnicamente algo se generó.
+            if nuevo and nuevo != nucleo_original:
+                palabras_nuevas[c["idx"]] = f"{prefijo}{nuevo}{sufijo}"  # se preserva la puntuación
+                metodos.append(metodo)
+                sinonimos_usados_por_idx.setdefault(c["idx"], set()).add(nuevo)
+
+        if not metodos:
+            continue
+
+        texto_nuevo = " ".join(palabras_nuevas)
+        clave = _normalizar_para_comparar(texto_nuevo)
+
+        if clave == clave_original:
+            continue  # idéntica a la oración ORIGINAL — no es una variante real
+        if clave in [_normalizar_para_comparar(v[0]) for v in variantes]:
+            continue  # idéntica a una variante ya generada en esta corrida
+
+        variantes.append((texto_nuevo, metodos))
+
+    return variantes
 
 
 # ─────────────────────────────────────────────────────────────
@@ -205,26 +340,32 @@ if __name__ == "__main__":
     print(f"Total: {len(oraciones)} oraciones base")
 
     print("\n=== Cargando diccionarios ===")
-    df_nouns, df_verbs = cargar_diccionarios()
-    print(f"Sustantivos: {len(df_nouns)} filas. Verbos: {len(df_verbs)} filas.")
+    df_nouns, df_verbs, df_adj = cargar_diccionarios()
+    print(f"Sustantivos: {len(df_nouns)} filas. Verbos: {len(df_verbs)} filas. Adjetivos: {len(df_adj)} filas.")
 
-    print("\n=== Aplicando diccionario (hasta 3 palabras con sinónimo, en la MISMA oración) ===")
+    palabras_ambiguas = calcular_palabras_ambiguas(df_nouns, df_verbs, df_adj)
+    print(f"Palabras ambiguas detectadas (aparecen en 2+ tablas, se excluyen): {len(palabras_ambiguas)}")
+
+    print("\n=== Aplicando diccionario (ignora oraciones con <2 candidatos; hasta 2 variantes, "
+          "hasta 3 reemplazos simultáneos c/u) ===")
     registros = []
-    sin_candidatos = 0
+    ignoradas_por_pocos_candidatos = 0
     for item in oraciones:
-        texto_nuevo, metodos = aplicar_diccionario(item["texto"], df_nouns, df_verbs, client, max_reemplazos=3)
-        if texto_nuevo is None:
-            sin_candidatos += 1
+        variantes = aplicar_diccionario(item["texto"], df_nouns, df_verbs, df_adj, palabras_ambiguas, client,
+                                          max_reemplazos=3, max_variantes=2)
+        if not variantes:
+            ignoradas_por_pocos_candidatos += 1
             continue
-        registros.append({
-            "texto": texto_nuevo,
-            "texto_base": item["texto"],
-            "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
-            "detalle_reemplazos": metodos,  # ej. ["sustantivo", "verbo"] — qué tipo se cambió, en orden
-            "dominio": item.get("dominio", "sin_clasificar"),
-            "estrategia": "3",
-        })
+        for texto_nuevo, metodos in variantes:
+            registros.append({
+                "texto": texto_nuevo,
+                "texto_base": item["texto"],
+                "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
+                "detalle_reemplazos": metodos,
+                "dominio": item.get("dominio", "sin_clasificar"),
+                "estrategia": "3",
+            })
 
-    print(f"\n{len(registros)} oraciones con al menos 1 reemplazo "
-          f"({sin_candidatos} sin ningún candidato en el diccionario).")
+    print(f"\n{len(registros)} variantes generadas "
+          f"({ignoradas_por_pocos_candidatos} oraciones ignoradas por tener menos de 2 candidatos).")
     guardar(registros)
