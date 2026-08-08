@@ -367,6 +367,15 @@ def _parsear_puntaje(valor) -> int | None:
         return None
 
 
+def _filtar_registro_export(reg: dict) -> dict:
+    return {
+        "texto": reg.get("texto", ""),
+        "dominio": reg.get("dominio", ""),
+        "prompt": reg.get("prompt", ""),
+        "seed_file": reg.get("seed_file", ""),
+    }
+
+
 def fase3_clasificar(dry_run: bool = False):
     print("=" * 60)
     modo = " (DRY RUN)" if dry_run else ""
@@ -463,7 +472,7 @@ def fase3_clasificar(dry_run: bool = False):
         else:
             with open(ruta, "a", encoding="utf-8") as f:
                 for reg in aprobados:
-                    f.write(json.dumps(reg, ensure_ascii=False) + "\n")
+                    f.write(json.dumps(_filtar_registro_export(reg), ensure_ascii=False) + "\n")
             print(f"   [+] {len(aprobados)} aprobados -> '{ruta}'.")
 
     if dorados:
@@ -474,7 +483,7 @@ def fase3_clasificar(dry_run: bool = False):
             os.makedirs(os.path.dirname(ruta), exist_ok=True)
             with open(ruta, "w", encoding="utf-8") as f:
                 for reg in dorados:
-                    f.write(json.dumps(reg, ensure_ascii=False) + "\n")
+                    f.write(json.dumps(_filtar_registro_export(reg), ensure_ascii=False) + "\n")
             print(f"   [+] {len(dorados)} dorados -> '{ruta}'.")
 
     for (seed_file, dominio), grupo in por_regenerar.items():
