@@ -111,7 +111,7 @@ if __name__ == "__main__":
     ruta, prompts = generar_estrategia_5(
         ejemplos_few_shot=seed_sentences,
         dominios=domains,
-        por_dominio=5,
+        por_dominio=10,
         seed_file_name=seed_filename,
     )
     print(f"=== Completado. Archivo guardado en: {ruta} ===")

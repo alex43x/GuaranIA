@@ -1,0 +1,71 @@
+CONTEO DE REGISTROS
+======================================================================
+
+*** ESTRATEGIA 3 ***
+----------------------------------------------------------------------
+Archivos: 0
+  (sin datos historicos)
+
+  Total ESTRATEGIA 3                  0
+
+*** ESTRATEGIA 5 ***
+----------------------------------------------------------------------
+Archivos commiteados: 27  |  Procesados por E3: 0
+
+  --- Archivos ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    educación                           5
+    salud                               5
+    Total (sin_seed)                   10
+  --- americasnli.jsonl ---
+    economía                           25
+    familia                            25
+    política                           25
+    salud                              25
+    vida cotidiana                     25
+    Total americasnli.jsonl           125
+  --- belele.jsonl ---
+    ciencia                             5
+    cultura                             5
+    educación                           5
+    música                              5
+    tecnología                          5
+    Total belele.jsonl                 25
+  --- flores-200.jsonl ---
+    deportes                           30
+    historia                           30
+    medio ambiente                     30
+    política                           30
+    salud                              30
+    tecnología                         30
+    Total flores-200.jsonl            180
+  --- jojajovai.jsonl ---
+    cultura                            30
+    deportes                           30
+    economía                           30
+    educación                          30
+    política                           30
+    salud                              30
+    Total jojajovai.jsonl             180
+  --- tatoeba.jsonl ---
+    clima                              45
+    comida                             45
+    familia                            45
+    tiempo libre                       45
+    vida cotidiana                     45
+    Total tatoeba.jsonl               225
+
+  --- Total commiteado                       745
+
+  --- Ya procesados por Estrategia 3 ---
+  --------------------------------------------------------------------
+  (ninguno)
+
+  --- Total procesados                         0
+
+  Total ESTRATEGIA 5                745
+
+======================================================================
+TOTAL GENERAL                     745
+======================================================================
