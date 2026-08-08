@@ -97,7 +97,7 @@ def armar_prompt(ejemplos: list[str], dominio: str) -> str:
     )
 
 
-def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_dominio: int = 10):
+def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_dominio: int = 10, seed_file_name: str = "") -> tuple[str, list[str]]:
     from google import genai
 
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
@@ -120,6 +120,7 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
                 "dominio": dominio,
                 "estrategia": "5",
                 "prompt": prompt,
+                "seed_file": seed_file_name,
             })
             prompts.append(prompt)
     ruta = guardar_lote(registros, estrategia="5")

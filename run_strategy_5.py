@@ -44,5 +44,6 @@ if __name__ == "__main__":
         ejemplos_few_shot=seed_sentences,
         dominios=domains,
         por_dominio=5,
+        seed_file_name=os.path.basename(SEED_FILE),
     )
     print("=== Estrategia 5 completada ===")
