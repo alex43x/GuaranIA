@@ -2,3 +2,5 @@
 credenciales.json
 __pycache__/
 /seeds
+backups
+procesados

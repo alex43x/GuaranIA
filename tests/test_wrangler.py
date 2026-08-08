@@ -51,8 +51,8 @@ regs = [
 ]
 filas = formatear_filas_e3(regs)
 assert len(filas) == 1
-assert filas[0] == ["Che aguata", "aguata", "reordenar", "vida_cotidiana", "3", "", "", ""]
-assert len(filas[0]) == 8
+assert filas[0] == ["Che aguata", "aguata", "reordenar", "vida_cotidiana", "3", "", "", "", ""]
+assert len(filas[0]) == 9
 print("  OK")
 
 print("=== formatear_filas_e5 ===")
@@ -61,18 +61,18 @@ regs = [
 ]
 filas = formatear_filas_e5(regs)
 assert len(filas) == 1
-assert filas[0] == ["Ha upei", "conectores", "5", "Genera una oracion...", "", "", ""]
-assert len(filas[0]) == 7
+assert filas[0] == ["Ha upei", "conectores", "5", "Genera una oracion...", "", "", "", ""]
+assert len(filas[0]) == 8
 print("  OK")
 
 print("=== COLUMNAS_E3 ===")
 assert COLUMNAS_E3 == ["texto", "texto_base", "tipo_transformacion", "dominio", "estrategia",
-                        "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+                        "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error"]
 print("  OK")
 
 print("=== COLUMNAS_E5 ===")
 assert COLUMNAS_E5 == ["texto", "dominio", "estrategia", "prompt",
-                        "puntaje_sintaxis", "puntaje_semantica", "correccion"]
+                        "puntaje_sintaxis", "puntaje_semantica", "correccion", "tipo_error"]
 print("  OK")
 
 print("\n=== filtrar_ya_revisados (sin archivo) ===")
