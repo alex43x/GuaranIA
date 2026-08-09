@@ -326,7 +326,7 @@ def verificar_reemplazo_valido_en_contexto(oracion: str, palabra_original: str, 
         f"Respondé SOLO con una única palabra: SI o NO."
     )
     try:
-        respuesta = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+        respuesta = client.models.generate_content(model="gemini-3.5-flash", contents=prompt)
         texto = (respuesta.text or "").strip().upper()
     except Exception:
         return False
@@ -368,7 +368,7 @@ def pedir_sinonimo_verbo_es(lema_original: str, client) -> str:
         f"Dame UN sinónimo en español, en infinitivo, del verbo '{lema_original}'. "
         f"Respondé solo el infinitivo, una palabra, sin explicación."
     )
-    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+    response = client.models.generate_content(model="gemini-3.5-flash", contents=prompt)
     return (response.text or "").strip().lower()
 
 
