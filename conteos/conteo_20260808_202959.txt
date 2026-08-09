@@ -1,0 +1,117 @@
+CONTEO DE REGISTROS
+======================================================================
+
+*** ESTRATEGIA 3 ***
+----------------------------------------------------------------------
+Archivos: 11
+
+  --- Reordenar ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    salud                              17
+    Total (sin_seed)                   17
+  --- americasnli.jsonl ---
+    vida cotidiana                      4
+    Total americasnli.jsonl             4
+  --- belele.jsonl ---
+    ciencia                            12
+    cultura                            15
+    educación                          10
+    música                             11
+    tecnología                         12
+    Total belele.jsonl                 60
+  --- jojajovai.jsonl ---
+    deportes                           21
+    economía                           15
+    educación                          16
+    política                           13
+    salud                              16
+    Total jojajovai.jsonl              81
+
+  --- Total reordenar                        162
+
+  --- Sinónimo ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    educación                          15
+    salud                              18
+    Total (sin_seed)                   33
+  --- flores-200.jsonl ---
+    deportes                            5
+    historia                            4
+    medio ambiente                      5
+    política                            4
+    salud                               5
+    tecnología                          4
+    Total flores-200.jsonl             27
+
+  --- Total sinónimo                          60
+
+  Total ESTRATEGIA 3                222
+
+*** ESTRATEGIA 5 ***
+----------------------------------------------------------------------
+Archivos pendientes: 215  |  Procesados por E3: 1
+
+  --- Pendientes ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    educación                           5
+    salud                               5
+    Total (sin_seed)                   10
+  --- americasnli.jsonl ---
+    economía                          185
+    familia                           185
+    política                          185
+    salud                             185
+    vida cotidiana                    185
+    Total americasnli.jsonl           925
+  --- flores-200.jsonl ---
+    deportes                          860
+    historia                          860
+    medio ambiente                    860
+    política                          860
+    salud                             860
+    tecnología                        860
+    Total flores-200.jsonl           5160
+  --- jojajovai.jsonl ---
+    cultura                           210
+    deportes                          210
+    economía                          210
+    educación                         210
+    política                          210
+    salud                             210
+    Total jojajovai.jsonl            1260
+  --- tatoeba.jsonl ---
+    clima                             550
+    comida                            550
+    familia                           550
+    tiempo libre                      550
+    vida cotidiana                    550
+    Total tatoeba.jsonl              2750
+
+  --- Total pendientes                     10105
+
+  --- Procesados por Reordenar ---
+  --------------------------------------------------------------------
+  --- belele.jsonl ---
+    ciencia                             5
+    cultura                             5
+    educación                           5
+    música                              5
+    tecnología                          5
+    Total belele.jsonl                 25
+
+  --- Total reordenar                         25
+
+  --- Procesados por Sinónimo ---
+  --------------------------------------------------------------------
+  (ninguno)
+
+  --- Total sinónimo                           0
+
+  Total ESTRATEGIA 5              10130
+
+======================================================================
+TOTAL GENERAL                   10352
+======================================================================
