@@ -1,0 +1,28 @@
+{"texto": "Che rogayguakuéra rehe cheaguara.", "texto_base": "Cheaguara che rogayguakuéra rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che memby rehe cheaguara.", "texto_base": "Cheaguara che memby rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Japepópe oĩ tembi'u michĩmi.", "texto_base": "Oĩ tembi'u michĩmi japepópe.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Japepópe oĩ tembi'u michĩmi.", "texto_base": "Oĩ tembi'u michĩmi japepópe.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che sy rehe cheaguara.", "texto_base": "Cheaguara che sy rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Pe terere ejapóma piko?", "texto_base": "Ejapóma piko pe terere?", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ajépa ko tereré ho'ysã porã.", "texto_base": "Ajépa ho'ysã porã ko tereré.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che sy rehe cheaguara.", "texto_base": "Cheaguara che sy rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ajépa ko tembi'u heite.", "texto_base": "Ajépa heite ko tembi'u.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ña'embépe oĩ tembi'u michĩmi.", "texto_base": "Oĩ tembi'u michĩmi ña'embépe.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Pe chipa oje'upáma!", "texto_base": "Oje'upáma pe chipa!", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ajakápe oĩ chipa haku porã.", "texto_base": "Oĩ chipa haku porã ajakápe.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko árape ajépa hakuete.", "texto_base": "Ajépa hakuete ko árape.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko árape ajépa hakuete.", "texto_base": "Ajépa hakuete ko árape.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko'ápe ajépa hakuete.", "texto_base": "Ajépa hakuete ko'ápe.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che sy, rohayhu!", "texto_base": "Rohayhu, che sy!", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Tom oimo'ã ikatuha ko'ẽrõ oky.", "texto_base": "Tom oimo'ã ikatuha oky ko'ẽrõ.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ikatu japytu'u ha ja'u tereré ipahápe.", "texto_base": "Ipahápe ikatu japytu'u ha ja'u tereré.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Oky haguére ne'ĩrã ikatu ñasẽ ndajeko.", "texto_base": "Ne'ĩrã ikatu ñasẽ oky haguére ndajeko.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ajépa ko ára iporãite jaterere haguã.", "texto_base": "Ajépa iporãite ko ára jaterere haguã.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Cheresarái pe kamby ajogua haguã.", "texto_base": "Cheresarái ajogua haguã pe kamby.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ajépa iporãite yvyramáta guýpe japytu'umi.", "texto_base": "Ajépa iporãite japytu'umi yvyramáta guýpe.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ikatúma ñasẽ japytu'u yvyra guýpe ipahápe.", "texto_base": "Ipahápe ikatúma ñasẽ japytu'u yvyra guýpe.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ikatu ñasẽ javy'a oñondive ko'ãga.", "texto_base": "Ko'ãga ikatu ñasẽ javy'a oñondive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ajépa ko'ápe hakuete.", "texto_base": "Ajépa hakuete ko'ápe.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Japepópe oĩ tembi'u michĩmi.", "texto_base": "Oĩ tembi'u michĩmi japepópe.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Yvyramáta guýpe ajépa iporãite japytu'umi.", "texto_base": "Ajépa iporãite japytu'umi yvyramáta guýpe.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko'ẽrõ Tom oimo'ã ikatuha oky.", "texto_base": "Tom oimo'ã ikatuha oky ko'ẽrõ.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
