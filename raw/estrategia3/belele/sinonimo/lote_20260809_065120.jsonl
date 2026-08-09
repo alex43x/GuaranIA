@@ -1,0 +1,1 @@
+{"texto": "Mávapa ko'ãva purahéi apytégui ojekuaave omuasãi haguére pe guarania ñande retãme ha tetã ambuére?", "texto_base": "Mávapa ko'ãva purahéi apytégui ojekuaave omoherakuã haguére pe guarania ñande retãme ha tetã ambuére?", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["verbo"], "dominio": "música", "seed_file": "belele.jsonl", "estrategia": "3"}
