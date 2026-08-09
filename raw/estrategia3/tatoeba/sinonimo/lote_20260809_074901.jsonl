@@ -1,0 +1,2 @@
+{"texto": "He jepéva ko mba'e'upy!", "texto_base": "He jepéva ko tembi'u!", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Mbovýpa hepy ko mba'e'upy?", "texto_base": "Mbovýpa hepy ko tembi'u?", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}

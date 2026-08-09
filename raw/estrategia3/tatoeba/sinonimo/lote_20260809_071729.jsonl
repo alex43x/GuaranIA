@@ -1,0 +1,3 @@
+{"texto": "Ahejáta ndéve pe hi'upy mesa ári.", "texto_base": "Ahejáta ndéve pe tembi'u mesa ári.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Ahejáta ndéve pe mba'e'upy mesa ári.", "texto_base": "Ahejáta ndéve pe tembi'u mesa ári.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "vida cotidiana", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Ahejáta ndéve hi'upy mesa ári.", "texto_base": "Ahejáta ndéve tembi'u mesa ári.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}

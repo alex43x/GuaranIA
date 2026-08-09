@@ -1,0 +1,3 @@
+{"texto": "Ko mba'e'upy niko ahekáva aína.", "texto_base": "Ko tembi'u niko ahekáva aína.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Mba'e hi'upy piko reheka aína?", "texto_base": "Mba'e tembi'u piko reheka aína?", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Ko mba'e'upy hína pe ahekáva aína.", "texto_base": "Ko tembi'u hína pe ahekáva aína.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}

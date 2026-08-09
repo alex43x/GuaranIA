@@ -1,0 +1,3 @@
+{"texto": "Che sy oñe'ẽkuri che túva ndive.", "texto_base": "Che sy oñe'ẽkuri che ru ndive.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "familia", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Che túva oñe'ẽkuri che sy ndive.", "texto_base": "Che ru oñe'ẽkuri che sy ndive.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "familia", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Che túva oñe'ẽkuri che sy ndive.", "texto_base": "Che ru oñe'ẽkuri che sy ndive.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "familia", "seed_file": "tatoeba.jsonl", "estrategia": "3"}

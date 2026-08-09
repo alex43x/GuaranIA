@@ -1,0 +1,3 @@
+{"texto": "Okyvúta hína ha oĩ amavera.", "texto_base": "Okyvúta hína ha oĩ aravera.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "clima", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Che ha'u mba'e'upy chevare'águi.", "texto_base": "Che ha'u tembi'u chevare'águi.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
+{"texto": "Che taita oha'ã ombovy'a che sýpe.", "texto_base": "Che ru oha'ã ombovy'a che sýpe.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "familia", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
