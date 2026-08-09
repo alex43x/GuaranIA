@@ -1,36 +1,32 @@
 """
-VALIDAR RAWS — Análisis de errores en raw/estrategia5/ (solo lectura)
-======================================================================
-Lee todos los .jsonl de raw/estrategia5/, pasa cada texto por el LLM
-local y reporta estadísticas por seed y dominio. No modifica nada.
+VALIDAR RAWS — Análisis de duplicados en raw/estrategia5/ (solo lectura, sin IA)
+===============================================================================
+Lee todos los .jsonl de raw/estrategia5/, aplica los filtros locales de
+data_wrangler (normalizar_texto + deduplicar_por_texto) y reporta estadísticas
+por seed y dominio. No llama a ningún LLM ni API externa, y no modifica nada.
+
+El dedup se paraleliza con mapear_paralelo (workers.py, MAX_WORKERS del .env).
 
 Uso:
     python validar_raws.py
 """
 
 import os
-import sys
 import json
 import glob
-import time
 from collections import defaultdict
 
-sys.path.insert(0, ".")
-from analizador_errores import analizar_oracion, parsear_respuesta, conectar_llm
+from data_wrangler import deduplicar_por_texto
+from workers import mapear_paralelo
 
 CARPETA = "raw/estrategia5"
-DELAY = 0.5
 
 
-def validar():
-    print("=" * 70)
-    print("VALIDACIÓN DE RAWS — SOLO LECTURA")
-    print("=" * 70)
-
-    conectar_llm()
-
+def leer_registros():
+    """Lee todos los .jsonl de CARPETA y agrupa los registros por (seed, dominio)."""
+    grupos = defaultdict(list)
     archivos = sorted(glob.glob(os.path.join(CARPETA, "**", "*.jsonl"), recursive=True))
-    registros = []
+    total_lineas = 0
 
     for ruta in archivos:
         with open(ruta, "r", encoding="utf-8") as f:
@@ -46,56 +42,68 @@ def validar():
                     continue
                 seed = reg.get("seed_file", "(sin_seed)")
                 dominio = reg.get("dominio", "sin_dominio")
-                registros.append((seed, dominio, texto))
+                grupos[(seed, dominio)].append({"texto": texto})
+                total_lineas += 1
 
+    return grupos, total_lineas
+
+
+def procesar_grupo(item) -> tuple:
+    """Aplica deduplicar_por_texto a un grupo (seed, dominio) -> lista de textos."""
+    (seed, dominio), registros = item
     total = len(registros)
-    print(f"\nAnalizando {total} registros...\n")
+    unicos = deduplicar_por_texto(registros)
+    descartados = total - len(unicos)
+    return (seed, dominio, {"total": total, "descartados": descartados, "ok": len(unicos)})
 
-    stats = defaultdict(lambda: {"total": 0, "errores": 0})
 
-    for i, (seed, dominio, texto) in enumerate(registros):
-        key = (seed, dominio)
-        stats[key]["total"] += 1
+def validar():
+    print("=" * 70)
+    print("VALIDACIÓN DE RAWS — SOLO LECTURA (sin IA, filtros locales)")
+    print("=" * 70)
 
-        try:
-            respuesta = analizar_oracion(texto)
-            errores = parsear_respuesta(respuesta)
-            if errores and errores != "sin errores":
-                stats[key]["errores"] += 1
-        except Exception as e:
-            pass
+    grupos, total = leer_registros()
 
-        if (i + 1) % 20 == 0 or i == total - 1:
-            print(f"   Progreso: {i + 1}/{total}")
+    print(f"\nAnalizando {total} registros en {len(grupos)} grupos (seed/dominio)...\n")
 
-        time.sleep(DELAY)
+    contador = {"procesados": 0}
+    total_grupos = len(grupos)
+
+    def al_completar(idx, item, resultado):
+        contador["procesados"] += 1
+        print(f"   Progreso: {contador['procesados']}/{total_grupos} grupos", flush=True)
+
+    resultados = mapear_paralelo(
+        list(grupos.items()),
+        procesar_grupo,
+        on_completado=al_completar,
+    )
 
     print("\n" + "=" * 70)
     print("RESULTADOS POR SEED Y DOMINIO")
     print("=" * 70)
 
-    total_errores = 0
-
     by_seed = defaultdict(dict)
-    for (seed, dominio), s in stats.items():
-        by_seed[seed][dominio] = s
+    for seed, dominio, stats in resultados:
+        by_seed[seed][dominio] = stats
+
+    total_descatados = 0
 
     for seed in sorted(by_seed.keys()):
         print(f"\n--- {seed} ---")
         seed_total = 0
-        seed_errores = 0
+        seed_descartados = 0
         for dominio in sorted(by_seed[seed].keys()):
             s = by_seed[seed][dominio]
             seed_total += s["total"]
-            seed_errores += s["errores"]
-            ok = s["total"] - s["errores"]
-            print(f"  {dominio:<20s} {s['total']:>4d} analizados | {s['errores']:>3d} con errores | {ok:>3d} ok")
-        total_errores += seed_errores
+            seed_descartados += s["descartados"]
+            print(f"  {dominio:<20s} {s['total']:>4d} totales | {s['descartados']:>3d} duplicados | {s['ok']:>3d} ok")
+        total_descatados += seed_descartados
 
-    tasa = (total_errores / total * 100) if total > 0 else 0
+    tasa = (total_descatados / total * 100) if total > 0 else 0
     print(f"\n{'=' * 70}")
-    print(f"TOTAL: {total} analizados | {total_errores} con errores | {total - total_errores} ok")
-    print(f"Tasa de error: {tasa:.1f}%")
+    print(f"TOTAL: {total} analizados | {total_descatados} duplicados | {total - total_descatados} ok")
+    print(f"Tasa de duplicados: {tasa:.1f}%")
     print("=" * 70)
 
 
