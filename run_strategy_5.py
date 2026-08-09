@@ -52,7 +52,7 @@ SEEDS_DIR = "seeds"
 def cargar_seeds(path: str, campo: str = "text", max_seeds: int = 25) -> list[str]:
     """Carga oraciones seed desde un archivo JSONL, muestreando hasta max_seeds."""
     seeds = []
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
             if not line:

@@ -41,7 +41,7 @@ def cargar_feedbacks() -> list[dict]:
         print(f"[Error] No se encontraron archivos en {FEEDBACK_DIR}")
         sys.exit(1)
     for archivo in sorted(archivos):
-        with open(archivo, "r", encoding="utf-8") as f:
+        with open(archivo, "r", encoding="utf-8", errors="replace") as f:
             for linea in f:
                 linea = linea.strip()
                 if linea:

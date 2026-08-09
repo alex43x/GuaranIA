@@ -157,7 +157,7 @@ def filtrar_ya_revisados(registros: list[dict]) -> list[dict]:
         ruta = _ruta_acumulado(estrategia)
         if not os.path.exists(ruta):
             continue
-        with open(ruta, "r", encoding="utf-8") as f:
+        with open(ruta, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 if line.strip():
                     try:
@@ -248,7 +248,7 @@ def fase1_subir():
         nombre = os.path.basename(ruta_archivo)
         print(f"   Leyendo {nombre}...")
         conteo = 0
-        with open(ruta_archivo, "r", encoding="utf-8") as f:
+        with open(ruta_archivo, "r", encoding="utf-8", errors="replace") as f:
             for line_num, line in enumerate(f, 1):
                 if not line.strip():
                     continue

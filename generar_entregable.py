@@ -30,7 +30,7 @@ def generar_entregable(carpeta: str, archivo_salida: str):
 
     archivos = sorted(glob.glob(os.path.join(carpeta, "**", "*.jsonl"), recursive=True))
     for ruta in archivos:
-        with open(ruta, "r", encoding="utf-8") as f:
+        with open(ruta, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 if not line.strip():
                     continue

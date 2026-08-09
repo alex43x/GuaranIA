@@ -71,7 +71,7 @@ def listar_seeds_disponibles(carpeta: str | None = None) -> list[dict]:
             seeds[seed_dir] = {"nombre": seed_dir, "archivos": 0, "registros": 0}
         seeds[seed_dir]["archivos"] += 1
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
                 seeds[seed_dir]["registros"] += sum(1 for ln in f if ln.strip())
         except Exception:
             pass
@@ -152,7 +152,7 @@ def cargar_registros_de_archivo(path: str) -> list[dict]:
     """Carga los registros utilizables (texto + dominio) de UN archivo .jsonl
     — la unidad de trabajo del loop lote-por-lote."""
     registros = []
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, "r", encoding="utf-8", errors="replace") as f:
         for line in f:
             line = line.strip()
             if not line:

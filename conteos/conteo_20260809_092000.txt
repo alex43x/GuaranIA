@@ -1,0 +1,215 @@
+CONTEO DE REGISTROS
+======================================================================
+
+*** ESTRATEGIA 3 ***
+----------------------------------------------------------------------
+Archivos: 204
+
+  --- Reordenar ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    salud                              17
+    Total (sin_seed)                   17
+  --- americasnli.jsonl ---
+    economía                          712
+    familia                           754
+    política                          734
+    salud                             709
+    vida cotidiana                    774
+    Total americasnli.jsonl          3683
+  --- belele.jsonl ---
+    ciencia                           443
+    cultura                           528
+    educación                         416
+    música                            484
+    tecnología                        480
+    Total belele.jsonl               2351
+  --- flores-200.jsonl ---
+    deportes                          270
+    historia                          279
+    medio ambiente                    274
+    política                          267
+    salud                             279
+    tecnología                        273
+    Total flores-200.jsonl           1642
+  --- jojajovai.jsonl ---
+    cultura                           256
+    deportes                          306
+    economía                          295
+    educación                         327
+    política                          295
+    salud                             332
+    Total jojajovai.jsonl            1811
+  --- tatoeba.jsonl ---
+    clima                             319
+    comida                            350
+    familia                           359
+    tiempo libre                      350
+    vida cotidiana                    365
+    Total tatoeba.jsonl              1743
+
+  --- Total reordenar                      11247
+
+  --- Sinónimo ---
+  --------------------------------------------------------------------
+  --- (sin_seed) ---
+    educación                          15
+    salud                              18
+    Total (sin_seed)                   33
+  --- americasnli.jsonl ---
+    economía                           33
+    familia                            65
+    política                           62
+    salud                              20
+    vida cotidiana                     48
+    Total americasnli.jsonl           228
+  --- belele.jsonl ---
+    ciencia                             7
+    cultura                             6
+    educación                          17
+    música                              7
+    tecnología                          4
+    Total belele.jsonl                 41
+  --- flores-200.jsonl ---
+    deportes                           50
+    historia                           42
+    medio ambiente                     40
+    política                           82
+    salud                              63
+    tecnología                         34
+    Total flores-200.jsonl            311
+
+  --- Total sinónimo                         613
+
+  Total ESTRATEGIA 3              11860
+
+*** ESTRATEGIA 5 ***
+----------------------------------------------------------------------
+Archivos pendientes: 3006  |  Procesados por E3: 172
+
+  --- Pendientes ---
+  --------------------------------------------------------------------
+  ---  ---
+    educación                           4
+    salud                               5
+    Total                               9
+  --- (sin_seed) ---
+    educación                           5
+    salud                               5
+    Total (sin_seed)                   10
+  --- americasnli.jsonl ---
+    economía                          160
+    familia                           160
+    política                          160
+    salud                             160
+    vida cotidiana                    160
+    Total americasnli.jsonl           800
+  --- belele.jsonl ---
+    ciencia                           200
+    cultura                           200
+    educación                         210
+    música                            200
+    salud                              10
+    tecnología                        200
+    Total belele.jsonl               1020
+  --- flores-200.jsonl ---
+    deportes                         1380
+    historia                         1380
+    medio ambiente                   1380
+    política                         1380
+    salud                            1380
+    tecnología                       1380
+    Total flores-200.jsonl           8280
+  --- jojajovai.jsonl ---
+    cultura                         29107
+    deportes                        29076
+    economía                        29062
+    educación                       29068
+    política                        29066
+    salud                           29063
+    Total jojajovai.jsonl          174442
+  --- tatoeba.jsonl ---
+    clima                             760
+    comida                            760
+    educación                           8
+    familia                           760
+    tiempo libre                      760
+    vida cotidiana                    760
+    Total tatoeba.jsonl              3808
+
+  --- Total pendientes                    188369
+
+  --- Procesados por Reordenar ---
+  --------------------------------------------------------------------
+  --- americasnli.jsonl ---
+    economía                          340
+    familia                           340
+    política                          340
+    salud                             340
+    vida cotidiana                    340
+    Total americasnli.jsonl          1700
+  --- belele.jsonl ---
+    ciencia                           120
+    cultura                           120
+    educación                         120
+    música                            120
+    tecnología                        120
+    Total belele.jsonl                600
+  --- flores-200.jsonl ---
+    deportes                           10
+    historia                           10
+    medio ambiente                     10
+    política                           10
+    salud                              10
+    tecnología                         10
+    Total flores-200.jsonl             60
+  --- jojajovai.jsonl ---
+    cultura                           160
+    deportes                          160
+    economía                          160
+    educación                         160
+    política                          160
+    salud                             160
+    Total jojajovai.jsonl             960
+  --- tatoeba.jsonl ---
+    clima                             260
+    comida                            260
+    familia                           260
+    tiempo libre                      260
+    vida cotidiana                    260
+    Total tatoeba.jsonl              1300
+
+  --- Total reordenar                       4620
+
+  --- Procesados por Sinónimo ---
+  --------------------------------------------------------------------
+  --- americasnli.jsonl ---
+    economía                          185
+    familia                           185
+    política                          185
+    salud                             185
+    vida cotidiana                    185
+    Total americasnli.jsonl           925
+  --- belele.jsonl ---
+    ciencia                           155
+    cultura                           155
+    educación                         155
+    música                            155
+    tecnología                        155
+    Total belele.jsonl                775
+  --- flores-200.jsonl ---
+    deportes                          150
+    historia                          150
+    medio ambiente                    150
+    política                          150
+    salud                             150
+    tecnología                        150
+    Total flores-200.jsonl            900
+
+  --- Total sinónimo                        2600
+
+  Total ESTRATEGIA 5             195589
+
+======================================================================
+TOTAL GENERAL                  207449
+======================================================================

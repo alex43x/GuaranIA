@@ -161,7 +161,7 @@ def modo_test():
             continue
 
         print(f"\n--- {ruta} ---")
-        with open(ruta, "r", encoding="utf-8") as f:
+        with open(ruta, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 if not line.strip():
                     continue

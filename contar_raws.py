@@ -32,7 +32,7 @@ def contar_estrategia(carpeta: str, excluir: list[str] | None = None) -> tuple[d
     if excluir:
         archivos = [p for p in archivos if not any(ex in p for ex in excluir)]
     for ruta in archivos:
-        with open(ruta, "r", encoding="utf-8") as f:
+        with open(ruta, "r", encoding="utf-8", errors="replace") as f:
             for line in f:
                 if not line.strip():
                     continue
