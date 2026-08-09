@@ -94,14 +94,79 @@ def elegir_seed_file() -> str:
             sys.exit(0)
 
 
+def elegir_seeds_multiple(archivos_disponibles: list[str]) -> list[str]:
+    """Menú interactivo multi-selección: elegí varias seeds por número, coma,
+    rango ('1-3') o 'all'. Mismo patrón que el selector de run_strategy_3.py
+    y diccionario_estrategia3.py, pero devuelve una lista en vez de una sola."""
+    print("\n=== Selecciona las seeds a usar en el loop ===")
+    for i, fname in enumerate(archivos_disponibles, 1):
+        desc = SEED_CATALOG[fname]["description"]
+        print(f"  [{i}] {fname}  —  {desc}")
+    print()
+
+    while True:
+        try:
+            entrada = input("Elegí (números separados por coma, rangos con '-', 'all', o 'q' para salir): ").strip()
+        except KeyboardInterrupt:
+            print("\nCancelado.")
+            sys.exit(0)
+
+        if entrada.lower() in ("q", "quit", "exit"):
+            print("Cancelado.")
+            sys.exit(0)
+        if entrada.lower() == "all":
+            return archivos_disponibles
+
+        elegidas = []
+        errores = []
+        for parte in entrada.split(","):
+            parte = parte.strip()
+            if not parte:
+                continue
+            if "-" in parte:
+                try:
+                    ini, fin = parte.split("-", 1)
+                    for n in range(int(ini), int(fin) + 1):
+                        if 1 <= n <= len(archivos_disponibles):
+                            elegidas.append(archivos_disponibles[n - 1])
+                        else:
+                            errores.append(str(n))
+                except ValueError:
+                    errores.append(parte)
+            else:
+                try:
+                    n = int(parte)
+                    if 1 <= n <= len(archivos_disponibles):
+                        elegidas.append(archivos_disponibles[n - 1])
+                    else:
+                        errores.append(str(n))
+                except ValueError:
+                    errores.append(parte)
+
+        if errores:
+            print(f"  Opciones no válidas: {', '.join(errores)}. Intentá de nuevo.\n")
+            continue
+        if not elegidas:
+            print("  No seleccionaste ninguna seed. Intentá de nuevo.\n")
+            continue
+
+        unicas = []
+        for s in elegidas:
+            if s not in unicas:
+                unicas.append(s)
+        print(f"  Seleccionadas: {', '.join(unicas)}\n")
+        return unicas
+
+
 # ─────────────────────────────────────────────────────────────
-# Modo loop continuo (--loop): round-robin sobre todas las seeds
-# disponibles, con pausa entre vueltas, sin selector interactivo.
+# Modo loop continuo (--loop): round-robin sobre las seeds elegidas,
+# con pausa entre vueltas.
 # ─────────────────────────────────────────────────────────────
 def ejecutar_loop_continuo(duracion_minutos: float | None = None, pausa_segundos: int = 5,
                              por_dominio: int = 10) -> None:
-    """Recorre round-robin las seeds disponibles en seeds/, generando
-    Estrategia 5 para cada una, con una pausa entre vueltas.
+    """Recorre round-robin las seeds que el usuario elija (de las disponibles
+    en seeds/), generando Estrategia 5 para cada una, con una pausa entre
+    vueltas.
 
     Si se pasa duracion_minutos, el loop corta al TERMINAR la vuelta en la
     que se cumple el tiempo (nunca a mitad de una generación). Sin ese
@@ -115,7 +180,9 @@ def ejecutar_loop_continuo(duracion_minutos: float | None = None, pausa_segundos
         print("[Error] No se encontraron archivos seed en la carpeta 'seeds/'.")
         sys.exit(1)
 
-    print(f"=== Estrategia 5 — Modo loop continuo (round-robin sobre {len(archivos_disponibles)} seed(s)) ===")
+    seeds_para_loop = elegir_seeds_multiple(archivos_disponibles)
+
+    print(f"=== Estrategia 5 — Modo loop continuo (round-robin sobre {len(seeds_para_loop)} seed(s)) ===")
     if duracion_minutos is not None:
         print(f"[Info] Se detiene al terminar la vuelta en la que se cumplan {duracion_minutos} minuto(s).")
     else:
@@ -126,7 +193,7 @@ def ejecutar_loop_continuo(duracion_minutos: float | None = None, pausa_segundos
 
     try:
         while True:
-            for seed_filename in archivos_disponibles:
+            for seed_filename in seeds_para_loop:
                 vuelta += 1
                 seed_path = os.path.join(SEEDS_DIR, seed_filename)
                 domains = SEED_CATALOG[seed_filename]["domains"]
