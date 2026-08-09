@@ -11,7 +11,7 @@ Necesita: .env con GEMINI_API_KEY
 import os
 import json
 import random
-import threading
+import asyncio
 import time
 from datetime import datetime
 from dotenv import load_dotenv
@@ -24,6 +24,7 @@ CARPETA_RAW = "raw"
 MAX_REINTENTOS = 3
 ESPERA_ENTRE_REINTENTOS = 5  # segundos, se duplica en cada intento
 TIMEOUT_GEMINI_MS = 60_000  # si una llamada se cuelga más de esto, falla y se reintenta
+CONCURRENCIA_E3 = int(os.getenv("CONCURRENCIA_E3", "20"))  # llamadas a Gemini en vuelo a la vez (async)
 
 
 def guardar_lote(registros: list[dict], estrategia: str, subcarpeta: str | None = None) -> str:
@@ -141,19 +142,114 @@ def transformar_oracion(oracion_base: str, client, tipo_cambio: str = "sinonimo"
     return resultado
 
 
-def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int = 4):
+async def llamar_gemini_con_reintentos_async(client, prompt: str, semaphore: asyncio.Semaphore) -> str | None:
+    """
+    Versión async de llamar_gemini_con_reintentos(), usada por generar_estrategia_3.
+    El semaphore acota cuántas llamadas a Gemini están en vuelo al mismo
+    tiempo — es el equivalente async de MAX_WORKERS, pero sin el overhead
+    de threads del SO, así que se puede sostener mucha más concurrencia
+    real con el mismo proceso.
+    """
+    espera = ESPERA_ENTRE_REINTENTOS
+    for intento in range(1, MAX_REINTENTOS + 1):
+        try:
+            async with semaphore:
+                response = await client.aio.models.generate_content(
+                    model="gemini-3.5-flash",
+                    contents=prompt,
+                )
+            if response.text is None:
+                raise ValueError("respuesta vacía de Gemini (posible bloqueo por filtro de seguridad)")
+            return response.text.strip()
+        except Exception as e:
+            print(f"    ⚠️  Intento {intento}/{MAX_REINTENTOS} falló: {e}")
+            if intento < MAX_REINTENTOS:
+                print(f"    Esperando {espera}s antes de reintentar...")
+                await asyncio.sleep(espera)
+                espera *= 2  # backoff exponencial
+    print("    🚨 Se agotaron los reintentos — se omite esta oración.")
+    return None
+
+
+async def transformar_oracion_async(oracion_base: str, client, semaphore: asyncio.Semaphore,
+                                      tipo_cambio: str = "sinonimo") -> str | None:
+    """Versión async de transformar_oracion() — misma lógica, ver esa para la doc completa."""
+    n_palabras = len(oracion_base.split())
+
+    if tipo_cambio == "reordenar" and n_palabras < 3:
+        print(f"    Oración muy corta ({n_palabras} palabras) para reordenar, se omite este tipo.")
+        return None
+
+    if tipo_cambio == "sinonimo":
+        instruccion = (
+            "Reescribí esta oración en guaraní cambiando lo que realmente pueda "
+            "reemplazarse por un sinónimo o expresión equivalente — puede ser una "
+            "sola palabra, o una expresión corta si esa es la unidad de significado "
+            "real (por ejemplo, una locución que funciona como una sola idea). "
+            "No cambies nada que no tenga un sinónimo razonable, no agregues ni "
+            "quites contenido que no sea parte del reemplazo. Devolvé solo la "
+            "oración resultante. Si la oración es tan corta que no hay nada con "
+            "sinónimo razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
+        )
+    else:  # reordenar
+        instruccion = (
+            "Reescribí esta oración en guaraní moviendo el fragmento que realmente "
+            "admita reordenarse sin romper el significado (por ejemplo, una frase "
+            "adverbial, un complemento, o el orden de una cláusula) — el tamaño de "
+            "ese fragmento depende de la oración, no tiene que ser una sola palabra. "
+            "No agregues ni quites palabras, solo cambiá el orden. Devolvé solo la "
+            "oración resultante. Si la oración es tan corta o simple que no hay "
+            "ningún reordenamiento razonable, respondé exactamente: SIN_VARIACION_POSIBLE"
+        )
+
+    prompt = f"{instruccion}\n\nOración: {oracion_base}"
+    resultado = await llamar_gemini_con_reintentos_async(client, prompt, semaphore)
+
+    if resultado is None:
+        return None
+
+    if "SIN_VARIACION_POSIBLE" in resultado:
+        print(f"    Gemini indicó que no hay variación posible para: \"{oracion_base}\"")
+        return None
+
+    if _normalizar_para_comparar(resultado) == _normalizar_para_comparar(oracion_base):
+        print(f"    ⚠️  La 'variante' salió idéntica a la original, se descarta: \"{oracion_base}\"")
+        return None
+
+    return resultado
+
+
+def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int = 4) -> list[str]:
     """
     SOLO reordenación (el sinónimo ahora lo maneja el diccionario, en
     diccionario_estrategia3.py). Intenta hasta max_reordenaciones
     variantes distintas por oración — se detiene antes si dos intentos
     seguidos no dan nada nuevo (sin inventar variantes que no existen).
 
+    Wrapper síncrono de _generar_estrategia_3_async(): mantiene la misma
+    firma que usa run_strategy_3.py, pero por dentro corre todo sobre
+    asyncio (ver esa función para el detalle de la concurrencia).
+    """
+    return asyncio.run(_generar_estrategia_3_async(oraciones_semilla, max_reordenaciones))
+
+
+async def _generar_estrategia_3_async(oraciones_semilla: list[dict], max_reordenaciones: int) -> list[str]:
+    """
+    Corre todas las semillas concurrentemente con asyncio en vez de threads
+    (CONCURRENCIA_E3 llamadas a Gemini en vuelo a la vez — configurable por
+    .env, default 20). Al no depender de threads del SO se puede sostener
+    mucha más concurrencia real con el mismo proceso.
+
     Escribe cada variante a disco (append + flush) apenas se genera, en vez
     de acumular todo en memoria y guardar recién al final — así, si el
-    proceso se cuelga y hay que matarlo, lo ya generado no se pierde. Cada
-    llamada a Gemini además tiene un timeout de TIMEOUT_GEMINI_MS: si la
-    red se cuelga a mitad de un request, ese intento falla solo y se
-    reintenta (con backoff) en vez de bloquear el hilo para siempre.
+    proceso se cuelga y hay que matarlo, lo ya generado no se pierde. Como
+    todo corre en un solo hilo/event loop (asyncio coopera, no hay
+    preemption real a mitad de una instrucción), no hace falta lock para
+    la escritura: dos tareas nunca escriben "al mismo tiempo" de verdad.
+
+    Cada llamada a Gemini además tiene un timeout de TIMEOUT_GEMINI_MS: si
+    la red se cuelga a mitad de un request, ese intento falla solo y se
+    reintenta (con backoff) en vez de bloquear todo para siempre.
     """
     from google import genai
     from google.genai import types
@@ -162,58 +258,57 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
     if not api_key:
         raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
     client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_GEMINI_MS))
+    semaphore = asyncio.Semaphore(CONCURRENCIA_E3)
 
-    # ── Escritura incremental ───────────────────────────────────
-    # El archivo de destino se decide por seed_file, que ya se conoce ANTES
-    # de generar nada (no depende de la respuesta de Gemini): se abre la
-    # primera vez que hace falta y se escribe cada variante apenas se
-    # produce, sin esperar a que termine todo el lote. Un solo lock global
-    # protege apertura + escritura (el costo es despreciable frente a la
-    # latencia de red de cada llamada a Gemini).
-    lock_escritura = threading.Lock()
+    print(f"[Info] Concurrencia máxima: {CONCURRENCIA_E3} llamadas a Gemini en vuelo a la vez.")
+
+    # ── Escritura incremental (ver docstring) ───────────────────
     archivos_abiertos: dict[str, object] = {}
     rutas_por_seed: dict[str, str] = {}
     conteo_por_seed: dict[str, int] = {}
 
     def escribir_registro(registro: dict) -> None:
         seed_file = registro.get("seed_file", "")
-        with lock_escritura:
-            if seed_file not in archivos_abiertos:
-                if seed_file:
-                    seed_stem = os.path.splitext(os.path.basename(seed_file))[0]
-                    carpeta = os.path.join(CARPETA_RAW, "estrategia3", seed_stem, "reordenar")
-                else:
-                    carpeta = os.path.join(CARPETA_RAW, "estrategia3")
-                os.makedirs(carpeta, exist_ok=True)
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
-                archivos_abiertos[seed_file] = open(ruta, "w", encoding="utf-8")
-                rutas_por_seed[seed_file] = ruta
-                conteo_por_seed[seed_file] = 0
-            f = archivos_abiertos[seed_file]
-            f.write(json.dumps(registro, ensure_ascii=False) + "\n")
-            f.flush()
-            conteo_por_seed[seed_file] += 1
+        if seed_file not in archivos_abiertos:
+            if seed_file:
+                seed_stem = os.path.splitext(os.path.basename(seed_file))[0]
+                carpeta = os.path.join(CARPETA_RAW, "estrategia3", seed_stem, "reordenar")
+            else:
+                carpeta = os.path.join(CARPETA_RAW, "estrategia3")
+            os.makedirs(carpeta, exist_ok=True)
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
+            archivos_abiertos[seed_file] = open(ruta, "w", encoding="utf-8")
+            rutas_por_seed[seed_file] = ruta
+            conteo_por_seed[seed_file] = 0
+        f = archivos_abiertos[seed_file]
+        f.write(json.dumps(registro, ensure_ascii=False) + "\n")
+        f.flush()
+        conteo_por_seed[seed_file] += 1
 
-    def procesar_semilla(semilla: dict) -> tuple[int, int]:
+    total = len(oraciones_semilla)
+    completadas = 0
+    sin_variacion = 0
+
+    async def procesar_semilla(semilla: dict) -> None:
         """Corre las hasta max_reordenaciones variantes de UNA semilla, en orden
-        (la lógica de dedup/corte temprano depende de ese orden). Lo que
-        mapear_paralelo() paraleliza es esto corriendo para varias semillas
-        a la vez, no las variantes dentro de una misma semilla."""
+        (la lógica de dedup/corte temprano depende de ese orden). Lo que se
+        paraleliza es esto corriendo como tarea de asyncio para varias
+        semillas a la vez, no las variantes dentro de una misma semilla."""
+        nonlocal completadas, sin_variacion
         variantes_vistas = []
         intentos_sin_exito_seguidos = 0
         seed_file = semilla.get("seed_file", "")
         n_generadas = 0
-        sin_variacion_semilla = 0
 
         preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
         print(f"  → arrancando: \"{preview}\"", flush=True)
 
         for _ in range(max_reordenaciones):
-            variante = transformar_oracion(semilla["texto"], client, tipo_cambio="reordenar")
+            variante = await transformar_oracion_async(semilla["texto"], client, semaphore, tipo_cambio="reordenar")
 
             if variante is None:
-                sin_variacion_semilla += 1
+                sin_variacion += 1
                 intentos_sin_exito_seguidos += 1
                 if intentos_sin_exito_seguidos >= 2:
                     break
@@ -238,32 +333,17 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
             })
             n_generadas += 1
 
-        return n_generadas, sin_variacion_semilla
-
-    total = len(oraciones_semilla)
-    completadas = 0
-    sin_variacion = 0
-
-    def al_completar(idx, semilla, resultado):
-        nonlocal completadas
         completadas += 1
-        n_generadas, _ = resultado
-        seed_file = semilla.get("seed_file", "")
         seed_tag = os.path.splitext(os.path.basename(seed_file))[0] if seed_file else "?"
-        preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
         print(f"  [{completadas}/{total}] ({seed_tag}) \"{preview}\" → {n_generadas} variantes", flush=True)
 
     try:
-        resultados = mapear_paralelo(oraciones_semilla, procesar_semilla, on_completado=al_completar)
+        await asyncio.gather(*(procesar_semilla(semilla) for semilla in oraciones_semilla))
     finally:
         # Pase lo que pase (éxito, excepción, Ctrl+C) lo ya escrito queda
         # bien cerrado y con el buffer del SO vaciado.
-        with lock_escritura:
-            for f in archivos_abiertos.values():
-                f.close()
-
-    for _, sin_variacion_semilla in resultados:
-        sin_variacion += sin_variacion_semilla
+        for f in archivos_abiertos.values():
+            f.close()
 
     if sin_variacion > 0:
         print(f"ℹ️  {sin_variacion} intentos sin variación posible (oración muy corta, "
