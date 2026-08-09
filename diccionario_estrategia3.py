@@ -134,52 +134,39 @@ def selector_consola(seeds: list[dict]) -> list[str]:
         return unicas
 
 
-def cargar_datos_estrategia_5(seeds: list[str] | None = None,
-                                carpeta_base: str | None = None) -> tuple[list[dict], list[str]]:
-    """Carga oraciones desde carpeta_base (default: procesados/reordenar/).
-    Retorna (registros, archivos_leidos)."""
+def listar_archivos_de_seeds(seeds: list[str], carpeta_base: str | None = None) -> list[str]:
+    """Devuelve la lista de archivos .jsonl (ordenada) de las seeds elegidas."""
     carpeta = carpeta_base or CARPETA_INSUMOS_SINONIMO
     if not os.path.exists(carpeta):
-        raise RuntimeError(
-            f"No existe '{carpeta}'. "
-            f"¿Ya ejecutaste run_strategy_3.py primero?"
-        )
+        raise RuntimeError(f"No existe '{carpeta}'. ¿Ya ejecutaste run_strategy_3.py primero?")
 
     patron = os.path.join(carpeta, "**", "*.jsonl")
     archivos = sorted(glob.glob(patron, recursive=True))
-
     if seeds:
-        archivos = [
-            p for p in archivos
-            if os.path.basename(os.path.dirname(p)) in seeds
-        ]
+        archivos = [p for p in archivos if os.path.basename(os.path.dirname(p)) in seeds]
+    return archivos
 
-    if not archivos:
-        raise RuntimeError(
-            f"No se encontraron archivos .jsonl en '{carpeta}'. "
-            f"¿Ya ejecutaste run_strategy_3.py primero?"
-        )
 
+def cargar_registros_de_archivo(path: str) -> list[dict]:
+    """Carga los registros utilizables (texto + dominio) de UN archivo .jsonl
+    — la unidad de trabajo del loop lote-por-lote."""
     registros = []
-    for path in sorted(archivos):
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    record = json.loads(line)
-                    if "texto" in record and "dominio" in record:
-                        registros.append({
-                            "texto": record["texto"],
-                            "dominio": record["dominio"],
-                            "seed_file": record.get("seed_file", ""),
-                        })
-                except json.JSONDecodeError:
-                    continue
-
-    print(f"Leídos {len(registros)} registros de {len(archivos)} archivo(s) desde '{carpeta}'.")
-    return registros, archivos
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+                if "texto" in record and "dominio" in record:
+                    registros.append({
+                        "texto": record["texto"],
+                        "dominio": record["dominio"],
+                        "seed_file": record.get("seed_file", ""),
+                    })
+            except json.JSONDecodeError:
+                continue
+    return registros
 
 
 # ─────────────────────────────────────────────────────────────
@@ -562,9 +549,9 @@ if __name__ == "__main__":
 
     seleccionadas = selector_consola(disponibles)
 
-    semillas, archivos = cargar_datos_estrategia_5(seeds=seleccionadas)
-    if not semillas:
-        raise RuntimeError("No hay registros utilizables.")
+    archivos = listar_archivos_de_seeds(seleccionadas)
+    if not archivos:
+        raise RuntimeError("No hay archivos utilizables para esas seeds.")
 
     print("\n=== Cargando diccionarios ===")
     df_nouns, df_verbs, df_adj = cargar_diccionarios()
@@ -573,97 +560,123 @@ if __name__ == "__main__":
     palabras_ambiguas = calcular_palabras_ambiguas(df_nouns, df_verbs, df_adj)
     print(f"Palabras ambiguas detectadas (aparecen en 2+ tablas, se excluyen): {len(palabras_ambiguas)}")
 
-    print("\n=== Aplicando diccionario (hasta 3 reemplazos simultáneos; según config por fuente) ===")
-    registros = []
-    ignoradas_por_pocos_candidatos = 0
-    ignoradas_por_config_fuente = 0
-    diagnostico = {}
-    total = len(semillas)
+    # ── Loop lote-por-lote ───────────────────────────────────────
+    # Igual que en run_strategy_3.py: se procesa UN archivo fuente por vez
+    # (generar variantes, guardarlas, y RECIÉN AHÍ mover ese archivo a
+    # procesados_estrategia_3/) en vez de juntar todos los archivos elegidos
+    # y mover todo junto al final. Así, si el proceso se corta a mitad de
+    # camino, los lotes ya cerrados no se vuelven a reprocesar ni duplicar.
+    print(f"\n{len(archivos)} archivo(s) a procesar, uno por vez.\n")
 
-    def procesar_item(item: dict) -> dict:
-        """Procesa UNA semilla contra el diccionario. Cada llamada usa su propio
-        diagnostico local (no comparte el dict global) porque mapear_paralelo()
-        corre esto en varios threads a la vez, y un dict mutado por += desde
-        varios threads a la vez no es seguro. Se mergea todo en el thread
-        principal después, al recorrer los resultados."""
-        fuente = item.get("seed_file", "desconocido")
-        config = config_para_fuente(fuente)
-        resultado = {"item": item, "fuente": fuente, "diag": {}, "variantes": None, "deshabilitado": False}
+    diagnostico_global = {}
+    archivos_procesados = 0
+    total_variantes = 0
+    total_ignoradas_candidatos = 0
+    total_ignoradas_config = 0
 
-        print(f"  → arrancando: \"{item['texto'][:70]}\"", flush=True)
+    for i, path in enumerate(archivos, 1):
+        seed_dir = os.path.basename(os.path.dirname(path))
+        print(f"\n=== Lote {i}/{len(archivos)}: {os.path.basename(path)} ({seed_dir}) ===")
 
-        if not config["sinonimos_habilitado"]:
-            resultado["deshabilitado"] = True
+        semillas = cargar_registros_de_archivo(path)
+        if not semillas:
+            print("  Sin registros utilizables en este archivo — se omite (no se mueve).")
+            continue
+
+        total = len(semillas)
+        registros = []
+        ignoradas_por_pocos_candidatos = 0
+        ignoradas_por_config_fuente = 0
+
+        def procesar_item(item: dict) -> dict:
+            """Procesa UNA semilla contra el diccionario. Cada llamada usa su propio
+            diagnostico local (no comparte el dict global) porque mapear_paralelo()
+            corre esto en varios threads a la vez, y un dict mutado por += desde
+            varios threads a la vez no es seguro. Se mergea todo en el thread
+            principal después, al recorrer los resultados."""
+            fuente = item.get("seed_file", "desconocido")
+            config = config_para_fuente(fuente)
+            resultado = {"item": item, "fuente": fuente, "diag": {}, "variantes": None, "deshabilitado": False}
+
+            print(f"  → arrancando: \"{item['texto'][:70]}\"", flush=True)
+
+            if not config["sinonimos_habilitado"]:
+                resultado["deshabilitado"] = True
+                return resultado
+
+            resultado["variantes"] = aplicar_diccionario(
+                item["texto"], df_nouns, df_verbs, df_adj, palabras_ambiguas, client,
+                pos_permitidos=config["pos_permitidos"],
+                max_reemplazos=3, max_variantes=1,
+                diagnostico=resultado["diag"],
+            )
             return resultado
 
-        resultado["variantes"] = aplicar_diccionario(
-            item["texto"], df_nouns, df_verbs, df_adj, palabras_ambiguas, client,
-            pos_permitidos=config["pos_permitidos"],
-            max_reemplazos=3, max_variantes=1,
-            diagnostico=resultado["diag"],
-        )
-        return resultado
+        contador = {"completadas": 0}
 
-    contador = {"completadas": 0}
+        def al_completar(idx, item, resultado):
+            contador["completadas"] += 1
+            print(f"  [{contador['completadas']}/{total}] listo: \"{item['texto'][:70]}\"", flush=True)
 
-    def al_completar(idx, item, resultado):
-        contador["completadas"] += 1
-        print(f"  [{contador['completadas']}/{total}] listo: \"{item['texto'][:70]}\"", flush=True)
+        resultados = mapear_paralelo(semillas, procesar_item, on_completado=al_completar)
 
-    resultados = mapear_paralelo(semillas, procesar_item, on_completado=al_completar)
+        for resultado in resultados:
+            item = resultado["item"]
+            for clave, valor in resultado["diag"].items():
+                diagnostico_global[clave] = diagnostico_global.get(clave, 0) + valor
 
-    for resultado in resultados:
-        item = resultado["item"]
-        for clave, valor in resultado["diag"].items():
-            diagnostico[clave] = diagnostico.get(clave, 0) + valor
+            if resultado["deshabilitado"]:
+                ignoradas_por_config_fuente += 1
+                continue
 
-        if resultado["deshabilitado"]:
-            ignoradas_por_config_fuente += 1
-            continue
+            variantes = resultado["variantes"]
+            if not variantes:
+                ignoradas_por_pocos_candidatos += 1
+                continue
+            for texto_nuevo, metodos in variantes:
+                registros.append({
+                    "texto": texto_nuevo,
+                    "texto_base": item["texto"],
+                    "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
+                    "detalle_reemplazos": metodos,
+                    "dominio": item.get("dominio", "sin_clasificar"),
+                    "seed_file": resultado["fuente"],
+                    "estrategia": "3",
+                })
 
-        variantes = resultado["variantes"]
-        if not variantes:
-            ignoradas_por_pocos_candidatos += 1
-            continue
-        for texto_nuevo, metodos in variantes:
-            registros.append({
-                "texto": texto_nuevo,
-                "texto_base": item["texto"],
-                "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
-                "detalle_reemplazos": metodos,
-                "dominio": item.get("dominio", "sin_clasificar"),
-                "seed_file": resultado["fuente"],
-                "estrategia": "3",
-            })
+        print(f"  {len(registros)} variantes generadas | "
+              f"{ignoradas_por_pocos_candidatos} ignoradas por <2 candidatos | "
+              f"{ignoradas_por_config_fuente} ignoradas por config de fuente.")
 
-    print(f"\n{len(registros)} variantes generadas | "
-          f"{ignoradas_por_pocos_candidatos} oraciones ignoradas por <2 candidatos | "
-          f"{ignoradas_por_config_fuente} ignoradas por config de fuente (sinónimos deshabilitados).")
+        guardar(registros)
 
-    print("\n=== Diagnóstico palabra por palabra ===")
-    print(f"  Palabras totales revisadas:        {diagnostico.get('palabras_totales', 0)}")
-    print(f"  Ambiguas (2+ tablas, descartadas):  {diagnostico.get('ambiguas', 0)}")
-    print(f"  No están en ningún diccionario:     {diagnostico.get('no_en_diccionario', 0)}")
-    print(f"  Categoría no permitida por fuente:  {diagnostico.get('pos_no_permitido', 0)}")
-    print(f"  Sin ningún sinónimo real (riqueza=0): {diagnostico.get('sin_riqueza', 0)}")
-    print(f"  Candidatos válidos encontrados:      {diagnostico.get('candidatos_validos', 0)}")
-    if diagnostico.get("candidatos_validos", 0) == 0:
-        print("\n  🚨 CERO candidatos válidos en todo el lote — por eso el archivo salió vacío.")
-        if diagnostico.get("pos_no_permitido", 0) > diagnostico.get("candidatos_validos", 0):
+        # Mover ESTE archivo fuente ya procesado antes de pasar al siguiente.
+        destino_dir = os.path.join(PROCESADOS_E3_SINONIMO, seed_dir)
+        os.makedirs(destino_dir, exist_ok=True)
+        destino = os.path.join(destino_dir, os.path.basename(path))
+        os.rename(path, destino)
+        print(f"  Movido a {destino}")
+
+        archivos_procesados += 1
+        total_variantes += len(registros)
+        total_ignoradas_candidatos += ignoradas_por_pocos_candidatos
+        total_ignoradas_config += ignoradas_por_config_fuente
+
+    print("\n=== Diagnóstico palabra por palabra (acumulado) ===")
+    print(f"  Palabras totales revisadas:        {diagnostico_global.get('palabras_totales', 0)}")
+    print(f"  Ambiguas (2+ tablas, descartadas):  {diagnostico_global.get('ambiguas', 0)}")
+    print(f"  No están en ningún diccionario:     {diagnostico_global.get('no_en_diccionario', 0)}")
+    print(f"  Categoría no permitida por fuente:  {diagnostico_global.get('pos_no_permitido', 0)}")
+    print(f"  Sin ningún sinónimo real (riqueza=0): {diagnostico_global.get('sin_riqueza', 0)}")
+    print(f"  Candidatos válidos encontrados:      {diagnostico_global.get('candidatos_validos', 0)}")
+    if diagnostico_global.get("candidatos_validos", 0) == 0:
+        print("\n  🚨 CERO candidatos válidos en todo el batch.")
+        if diagnostico_global.get("pos_no_permitido", 0) > diagnostico_global.get("candidatos_validos", 0):
             print("     Sospecha principal: revisá pos_permitidos en config_por_fuente.py — "
                   "puede tener un error de tipeo (ej. 'verbos' en vez de 'verbo').")
 
-    rutas = guardar(registros)
-
-    # Mover archivos de insumo ya procesados para no re-leerlos
-    if rutas and archivos:
-        for path in archivos:
-            seed_dir = os.path.basename(os.path.dirname(path))
-            destino_dir = os.path.join(PROCESADOS_E3_SINONIMO, seed_dir)
-            os.makedirs(destino_dir, exist_ok=True)
-            destino = os.path.join(destino_dir, os.path.basename(path))
-            os.rename(path, destino)
-        print(f"\nMovidos {len(archivos)} archivo(s) a {PROCESADOS_E3_SINONIMO}/")
-
     print("\n=== Completado ===")
-    print(f"    Total variantes generadas: {len(registros)}")
+    print(f"    Archivos procesados: {archivos_procesados}/{len(archivos)}")
+    print(f"    Total variantes generadas: {total_variantes} | "
+          f"{total_ignoradas_candidatos} ignoradas por <2 candidatos | "
+          f"{total_ignoradas_config} ignoradas por config de fuente.")

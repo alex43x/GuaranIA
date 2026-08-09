@@ -118,57 +118,37 @@ def selector_consola(seeds: list[dict]) -> list[str]:
         return unicas
 
 
-def cargar_datos_estrategia_5(seeds: list[str] | None = None) -> tuple[list[dict], list[str]]:
-    """
-    Carga lo generado por la Estrategia 5 — busca en raw/estrategia5/
-    (crudo, todavía sin validar) o en procesados/estrategia5/ (ya
-    subido a Sheets, según ESTRATEGIA_5_VALIDADA).
-
-    Si 'seeds' se especifica, solo se leen archivos de esas subcarpetas.
-
-    Retorna (registros, archivos_leidos). Los archivos dentro de
-    procesados_estrategia_3/ se excluyen automáticamente.
-    """
+def listar_archivos_de_seeds(seeds: list[str]) -> list[str]:
+    """Devuelve la lista de archivos .jsonl (ordenada) de las seeds elegidas,
+    excluyendo los ya procesados por Estrategia 3."""
     carpeta = PROCESADOS_DIR if ESTRATEGIA_5_VALIDADA else RAW_DIR
     patron = os.path.join(carpeta, "**", "*.jsonl")
     archivos = sorted(glob.glob(patron, recursive=True))
-
-    # Excluir archivos ya procesados por Estrategia 3
     archivos = [p for p in archivos if "procesados_estrategia_3" not in p]
+    archivos = [p for p in archivos if os.path.basename(os.path.dirname(p)) in seeds]
+    return archivos
 
-    if seeds:
-        archivos = [
-            p for p in archivos
-            if os.path.basename(os.path.dirname(p)) in seeds
-        ]
 
-    if not archivos:
-        raise RuntimeError(
-            f"No se encontraron archivos .jsonl en '{carpeta}'. "
-            f"¿Ya corriste generar_estrategia_5()? ¿Están en la carpeta correcta?"
-        )
-
+def cargar_registros_de_archivo(path: str) -> list[dict]:
+    """Carga los registros utilizables (texto + dominio) de UN archivo .jsonl
+    de Estrategia 5 — la unidad de trabajo del loop lote-por-lote."""
     registros = []
-    for path in sorted(archivos):
-        with open(path, "r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    record = json.loads(line)
-                    if "texto" in record and "dominio" in record:
-                        registros.append({
-                            "texto": record["texto"],
-                            "dominio": record["dominio"],
-                            "seed_file": record.get("seed_file", ""),
-                        })
-                except json.JSONDecodeError:
-                    continue
-
-    print(f"Leídos {len(registros)} registros de {len(archivos)} archivo(s) de Estrategia 5 "
-          f"({'validados' if ESTRATEGIA_5_VALIDADA else 'CRUDOS, sin validar'}).")
-    return registros, archivos
+    with open(path, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                record = json.loads(line)
+                if "texto" in record and "dominio" in record:
+                    registros.append({
+                        "texto": record["texto"],
+                        "dominio": record["dominio"],
+                        "seed_file": record.get("seed_file", ""),
+                    })
+            except json.JSONDecodeError:
+                continue
+    return registros
 
 
 if __name__ == "__main__":
@@ -184,33 +164,56 @@ if __name__ == "__main__":
 
     seleccionadas = selector_consola(disponibles)
 
-    semillas, archivos = cargar_datos_estrategia_5(seeds=seleccionadas)
-    if not semillas:
-        raise RuntimeError("No hay registros utilizables de la Estrategia 5.")
+    archivos = listar_archivos_de_seeds(seleccionadas)
+    if not archivos:
+        raise RuntimeError("No hay archivos utilizables de la Estrategia 5 para esas seeds.")
 
-    print(f"Semillas disponibles: {len(semillas)}. "
-          f"Hasta {MAX_REORDENACIONES} reordenación(es) por semilla.")
+    # ── Loop lote-por-lote ───────────────────────────────────────
+    # En vez de juntar TODOS los archivos elegidos en una sola llamada a
+    # generar_estrategia_3() y mover todo junto al final, se procesa un
+    # archivo fuente por vez: se genera, se guarda, y RECIÉN AHÍ se mueve
+    # ESE archivo a procesados_estrategia_3/. Así, si el proceso se corta a
+    # mitad de camino (cuelgue de Gemini, kill manual, lo que sea), los
+    # archivos de lotes anteriores ya quedaron "cerrados" — un reintento
+    # solo vuelve a procesar el lote que estaba en curso, no todo el batch.
+    print(f"\n{len(archivos)} archivo(s) a procesar, uno por vez.\n")
 
-    rutas = generar_estrategia_3(semillas, max_reordenaciones=MAX_REORDENACIONES)
-
+    archivos_procesados = 0
+    total_semillas = 0
     total_lineas = 0
-    for ruta in rutas:
-        with open(ruta, "r", encoding="utf-8") as f:
-            lineas = [ln for ln in f if ln.strip()]
-        total_lineas += len(lineas)
-        seed_tag = os.path.basename(os.path.dirname(ruta))
-        print(f"    {ruta}: {len(lineas)} reordenaciones ({seed_tag})")
 
-    # Mover archivos de E5 ya procesados para no re-leerlos
-    if rutas and archivos:
-        for path in archivos:
-            seed_dir = os.path.basename(os.path.dirname(path))
-            destino_dir = os.path.join(PROCESADOS_E3_DIR, "reordenar", seed_dir)
-            os.makedirs(destino_dir, exist_ok=True)
-            destino = os.path.join(destino_dir, os.path.basename(path))
-            os.rename(path, destino)
-        print(f"\nMovidos {len(archivos)} archivo(s) a {PROCESADOS_E3_DIR}")
+    for i, path in enumerate(archivos, 1):
+        seed_dir = os.path.basename(os.path.dirname(path))
+        print(f"\n=== Lote {i}/{len(archivos)}: {os.path.basename(path)} ({seed_dir}) ===")
+
+        semillas = cargar_registros_de_archivo(path)
+        if not semillas:
+            print("  Sin registros utilizables en este archivo — se omite (no se mueve).")
+            continue
+
+        print(f"  {len(semillas)} semillas. Hasta {MAX_REORDENACIONES} reordenación(es) por semilla.")
+
+        rutas = generar_estrategia_3(semillas, max_reordenaciones=MAX_REORDENACIONES)
+
+        lineas_lote = 0
+        for ruta in rutas:
+            with open(ruta, "r", encoding="utf-8") as f:
+                lineas = [ln for ln in f if ln.strip()]
+            lineas_lote += len(lineas)
+            print(f"    {ruta}: {len(lineas)} reordenaciones")
+
+        # Mover ESTE archivo fuente ya procesado antes de pasar al siguiente.
+        destino_dir = os.path.join(PROCESADOS_E3_DIR, "reordenar", seed_dir)
+        os.makedirs(destino_dir, exist_ok=True)
+        destino = os.path.join(destino_dir, os.path.basename(path))
+        os.rename(path, destino)
+        print(f"  Movido a {destino}")
+
+        archivos_procesados += 1
+        total_semillas += len(semillas)
+        total_lineas += lineas_lote
 
     print(f"\n=== Completado ===")
-    print(f"    Semillas: {len(semillas)} | Máximo posible: {len(semillas) * MAX_REORDENACIONES}")
+    print(f"    Archivos procesados: {archivos_procesados}/{len(archivos)}")
+    print(f"    Semillas: {total_semillas} | Máximo posible: {total_semillas * MAX_REORDENACIONES}")
     print(f"    Reordenaciones reales logradas: {total_lineas}")
