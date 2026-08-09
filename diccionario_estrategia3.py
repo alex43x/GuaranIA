@@ -17,6 +17,7 @@ import glob
 import random
 import json
 import re
+import threading
 from datetime import datetime
 import pandas as pd
 from dotenv import load_dotenv
@@ -500,32 +501,47 @@ def aplicar_diccionario(oracion: str, df_nouns: pd.DataFrame, df_verbs: pd.DataF
 # ─────────────────────────────────────────────────────────────
 # Guardar
 # ─────────────────────────────────────────────────────────────
-def guardar(registros: list[dict]) -> list[str]:
-    if not registros:
-        print("Nada que guardar (0 registros) — no se crea archivo.")
-        return []
+class EscritorIncremental:
+    """Escribe cada variante de sinónimo a disco (append + flush) apenas se
+    genera, en vez de acumular todo en memoria y guardar recién al final —
+    mismo patrón que escribir_registro() en strategy_pruebas.py (reordenar).
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    agrupados: dict[str, list[dict]] = {}
-    for reg in registros:
-        seed = reg.get("seed_file", "") or "(sin_seed)"
-        agrupados.setdefault(seed, []).append(reg)
+    A diferencia de la versión async de reordenar, acá el paralelismo es
+    con threads reales (mapear_paralelo usa ThreadPoolExecutor), así que
+    SÍ hace falta un lock para que dos threads no escriban "al mismo
+    tiempo" de verdad.
 
-    rutas = []
-    for seed, grupo in agrupados.items():
-        if seed != "(sin_seed)":
-            seed_stem = os.path.splitext(os.path.basename(seed))[0]
-        else:
-            seed_stem = "(sin_seed)"
-        carpeta = os.path.join(CARPETA_BASE_E3, seed_stem, "sinonimo")
-        os.makedirs(carpeta, exist_ok=True)
-        ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
-        with open(ruta, "w", encoding="utf-8") as f:
-            for reg in grupo:
-                f.write(json.dumps(reg, ensure_ascii=False) + "\n")
-        print(f"Guardado: {ruta} ({len(grupo)} registros)")
-        rutas.append(ruta)
-    return rutas
+    Se instancia una por archivo fuente procesado (una por vuelta del loop
+    lote-por-lote en __main__), no una para todo el run.
+    """
+
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._archivos: dict[str, object] = {}
+        self.rutas: dict[str, str] = {}
+        self.conteo: dict[str, int] = {}
+
+    def escribir(self, registro: dict) -> None:
+        seed = registro.get("seed_file", "") or "(sin_seed)"
+        with self._lock:
+            if seed not in self._archivos:
+                seed_stem = os.path.splitext(os.path.basename(seed))[0] if seed != "(sin_seed)" else "(sin_seed)"
+                carpeta = os.path.join(CARPETA_BASE_E3, seed_stem, "sinonimo")
+                os.makedirs(carpeta, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
+                self._archivos[seed] = open(ruta, "w", encoding="utf-8")
+                self.rutas[seed] = ruta
+                self.conteo[seed] = 0
+            f = self._archivos[seed]
+            f.write(json.dumps(registro, ensure_ascii=False) + "\n")
+            f.flush()
+            self.conteo[seed] += 1
+
+    def cerrar(self) -> None:
+        with self._lock:
+            for f in self._archivos.values():
+                f.close()
 
 
 # ─────────────────────────────────────────────────────────────
@@ -584,19 +600,20 @@ if __name__ == "__main__":
             continue
 
         total = len(semillas)
-        registros = []
         ignoradas_por_pocos_candidatos = 0
         ignoradas_por_config_fuente = 0
+        escritor = EscritorIncremental()
 
         def procesar_item(item: dict) -> dict:
-            """Procesa UNA semilla contra el diccionario. Cada llamada usa su propio
-            diagnostico local (no comparte el dict global) porque mapear_paralelo()
-            corre esto en varios threads a la vez, y un dict mutado por += desde
-            varios threads a la vez no es seguro. Se mergea todo en el thread
-            principal después, al recorrer los resultados."""
+            """Procesa UNA semilla contra el diccionario y escribe sus variantes a
+            disco (append + flush) apenas aplicar_diccionario() termina — no
+            espera a que terminen las demás semillas del archivo. El diagnostico
+            usa un dict local (no el global) porque mapear_paralelo() corre esto
+            en varios threads a la vez, y un dict mutado por += desde varios
+            threads no es seguro; se mergea en el thread principal después."""
             fuente = item.get("seed_file", "desconocido")
             config = config_para_fuente(fuente)
-            resultado = {"item": item, "fuente": fuente, "diag": {}, "variantes": None, "deshabilitado": False}
+            resultado = {"item": item, "diag": {}, "n_variantes": 0, "deshabilitado": False}
 
             print(f"  → arrancando: \"{item['texto'][:70]}\"", flush=True)
 
@@ -604,12 +621,23 @@ if __name__ == "__main__":
                 resultado["deshabilitado"] = True
                 return resultado
 
-            resultado["variantes"] = aplicar_diccionario(
+            variantes = aplicar_diccionario(
                 item["texto"], df_nouns, df_verbs, df_adj, palabras_ambiguas, client,
                 pos_permitidos=config["pos_permitidos"],
                 max_reemplazos=3, max_variantes=1,
                 diagnostico=resultado["diag"],
             )
+            for texto_nuevo, metodos in variantes:
+                escritor.escribir({
+                    "texto": texto_nuevo,
+                    "texto_base": item["texto"],
+                    "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
+                    "detalle_reemplazos": metodos,
+                    "dominio": item.get("dominio", "sin_clasificar"),
+                    "seed_file": fuente,
+                    "estrategia": "3",
+                })
+            resultado["n_variantes"] = len(variantes)
             return resultado
 
         contador = {"completadas": 0}
@@ -618,37 +646,29 @@ if __name__ == "__main__":
             contador["completadas"] += 1
             print(f"  [{contador['completadas']}/{total}] listo: \"{item['texto'][:70]}\"", flush=True)
 
-        resultados = mapear_paralelo(semillas, procesar_item, on_completado=al_completar)
+        try:
+            resultados = mapear_paralelo(semillas, procesar_item, on_completado=al_completar)
+        finally:
+            # Pase lo que pase, lo ya escrito queda cerrado y flusheado.
+            escritor.cerrar()
 
+        variantes_generadas = 0
         for resultado in resultados:
-            item = resultado["item"]
             for clave, valor in resultado["diag"].items():
                 diagnostico_global[clave] = diagnostico_global.get(clave, 0) + valor
 
             if resultado["deshabilitado"]:
                 ignoradas_por_config_fuente += 1
-                continue
-
-            variantes = resultado["variantes"]
-            if not variantes:
+            elif resultado["n_variantes"] == 0:
                 ignoradas_por_pocos_candidatos += 1
-                continue
-            for texto_nuevo, metodos in variantes:
-                registros.append({
-                    "texto": texto_nuevo,
-                    "texto_base": item["texto"],
-                    "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
-                    "detalle_reemplazos": metodos,
-                    "dominio": item.get("dominio", "sin_clasificar"),
-                    "seed_file": resultado["fuente"],
-                    "estrategia": "3",
-                })
+            else:
+                variantes_generadas += resultado["n_variantes"]
 
-        print(f"  {len(registros)} variantes generadas | "
+        print(f"  {variantes_generadas} variantes generadas | "
               f"{ignoradas_por_pocos_candidatos} ignoradas por <2 candidatos | "
               f"{ignoradas_por_config_fuente} ignoradas por config de fuente.")
-
-        guardar(registros)
+        for seed, ruta in escritor.rutas.items():
+            print(f"    {ruta}: {escritor.conteo[seed]} registros")
 
         # Mover ESTE archivo fuente ya procesado antes de pasar al siguiente.
         destino_dir = os.path.join(PROCESADOS_E3_SINONIMO, seed_dir)
@@ -658,7 +678,7 @@ if __name__ == "__main__":
         print(f"  Movido a {destino}")
 
         archivos_procesados += 1
-        total_variantes += len(registros)
+        total_variantes += variantes_generadas
         total_ignoradas_candidatos += ignoradas_por_pocos_candidatos
         total_ignoradas_config += ignoradas_por_config_fuente
 
