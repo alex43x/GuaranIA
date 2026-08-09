@@ -1,0 +1,60 @@
+{"texto": "Pe mitã kamby ndo'uséi.", "texto_base": "Pe mitã ndo'uséi kamby.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Mitã ko tembi'u ndo'usevéi.", "texto_base": "Mitã ndo'usevéi ko tembi'u.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ndo'uséi kamby ko'ã mitã.", "texto_base": "Ko'ã mitã ndo'uséi kamby.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Pe jagua ko tembi'u ndo'uséi.", "texto_base": "Pe jagua ndo'uséi ko tembi'u.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Pe tereré eho embosako'i.", "texto_base": "Eho embosako'i pe tereré.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Jajapo hagua tereré ndaipóri y ro'ysã.", "texto_base": "Ndaipóri y ro'ysã jajapo hagua tereré.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che sy rehe cheaguaraite.", "texto_base": "Cheaguaraite che sy rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che memby rehe cheaguaraite.", "texto_base": "Cheaguaraite che memby rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Jajapo hag̃ua terere ndaipóri y ro'ysã.", "texto_base": "Ndaipóri y ro'ysã jajapo hag̃ua terere.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che sy tembi'u ro'ysã ndo'uséi.", "texto_base": "Che sy ndo'uséi tembi'u ro'ysã.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ndokesei gueteri mitã.", "texto_base": "Mitã ndokesei gueteri.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che memby rehe cheaguaraite.", "texto_base": "Cheaguaraite che memby rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che rogayguakuéra rehe cheaguaraite.", "texto_base": "Cheaguaraite che rogayguakuéra rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che memby rehe cheaguaraite.", "texto_base": "Cheaguaraite che memby rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che rogayguakuéra rehe cheaguaraite.", "texto_base": "Cheaguaraite che rogayguakuéra rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che rogayguakuéra rehe cheaguaraite.", "texto_base": "Cheaguaraite che rogayguakuéra rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che memby rehe cheaguaraite.", "texto_base": "Cheaguaraite che memby rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che sy, che roañuãse.", "texto_base": "Che roañuãse, che sy.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Chipa guasu iporã chéve.", "texto_base": "Iporã chéve chipa guasu.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che rogayguakuéra rehe cheaguaraite.", "texto_base": "Cheaguaraite che rogayguakuéra rehe.", "tipo_transformacion": "reordenar", "dominio": "familia", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che rembi'u anivéna e'u.", "texto_base": "Anivéna e'u che rembi'u.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Chipakuéra iporã chéve.", "texto_base": "Iporã chéve chipakuéra.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko tembi'u iporã chéve.", "texto_base": "Iporã chéve ko tembi'u.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Tembi'u Paraguái iporã chéve.", "texto_base": "Iporã chéve tembi'u Paraguái.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Mitã chipa o'use.", "texto_base": "Mitã o'use chipa.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko tembi'u iporã chéve.", "texto_base": "Iporã chéve ko tembi'u.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko haku ijetu'u.", "texto_base": "Ijetu'u ko haku.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Tembi'u Paraguái iporã chéve.", "texto_base": "Iporã chéve tembi'u Paraguái.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Naimo'ãi nde ikatuha tembi'u koichagua rejapo.", "texto_base": "Naimo'ãi nde ikatuha rejapo tembi'u koichagua.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko tembi'u iporã chéve.", "texto_base": "Iporã chéve ko tembi'u.", "tipo_transformacion": "reordenar", "dominio": "comida", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko haku ijetu'u.", "texto_base": "Ijetu'u ko haku.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko ama ndojejokái.", "texto_base": "Ndojejokái ko ama.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko haku ijetu'u.", "texto_base": "Ijetu'u ko haku.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko ára ijetu'u hakuetereígui.", "texto_base": "Ijetu'u ko ára hakuetereígui.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Pe ára ro'y iporã chéve.", "texto_base": "Iporã chéve pe ára ro'y.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko ára tamora'e iporã.", "texto_base": "Tamora'e iporã ko ára.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Tamora'e ko ára iporã.", "texto_base": "Tamora'e iporã ko ára.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko ára ro'y iporã chéve.", "texto_base": "Iporã chéve ko ára ro'y.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko haku ijetu'u.", "texto_base": "Ijetu'u ko haku.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko ka'arúpe asẽse aguatami.", "texto_base": "Asẽse aguatami ko ka'arúpe.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Osẽse oñembosarái mitã.", "texto_base": "Mitã osẽse oñembosarái.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che angirũnguéra ndive iporã chéve ha'u tereré.", "texto_base": "Iporã chéve ha'u tereré che angirũnguéra ndive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko ka'aru aha'ãse vakapipopo che irũnguéra ndive.", "texto_base": "Aha'ãse vakapipopo che irũnguéra ndive ko ka'aru.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Osẽse ohuga manga mitã.", "texto_base": "Mitã osẽse ohuga manga.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Osẽse mitãnguéra oha'ã mangapy.", "texto_base": "Mitãnguéra osẽse oha'ã mangapy.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che irũnguéra ndive ahase añembosarái manga.", "texto_base": "Ahase añembosarái manga che irũnguéra ndive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che irũnguéra ndive iporã chéve aha'ã mangapy.", "texto_base": "Iporã chéve aha'ã mangapy che irũnguéra ndive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Iporã chéve añembosarái che irũnguéra ndive mangapy rehe.", "texto_base": "Iporã chéve añembosarái mangapy rehe che irũnguéra ndive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che angirũnguéra ndive che asẽse añembosarái.", "texto_base": "Che asẽse añembosarái che angirũnguéra ndive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ndo'uséi pe mitã kamby.", "texto_base": "Pe mitã ndo'uséi kamby.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ko'ã mitã kamby ndo'uséi.", "texto_base": "Ko'ã mitã ndo'uséi kamby.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Tembi'u ro'ysã ndo'uséi che sy.", "texto_base": "Che sy ndo'uséi tembi'u ro'ysã.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Jajapo haguã tereré ndaiporivéma ka'a.", "texto_base": "Ndaiporivéma ka'a jajapo haguã tereré.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Tamora'e ko ára iporã.", "texto_base": "Tamora'e iporã ko ára.", "tipo_transformacion": "reordenar", "dominio": "clima", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Osẽse oha'ã mangapy mitãnguéra.", "texto_base": "Mitãnguéra osẽse oha'ã mangapy.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che irũnguéra ndive iporã chéve añembosarái mangapy rehe.", "texto_base": "Iporã chéve añembosarái mangapy rehe che irũnguéra ndive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Che asẽse che angirũnguéra ndive añembosarái.", "texto_base": "Che asẽse añembosarái che angirũnguéra ndive.", "tipo_transformacion": "reordenar", "dominio": "tiempo libre", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Kamby ndo'uséi ko'ã mitã.", "texto_base": "Ko'ã mitã ndo'uséi kamby.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Ndo'uséi che sy tembi'u ro'ysã.", "texto_base": "Che sy ndo'uséi tembi'u ro'ysã.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}
+{"texto": "Mitã gueteri ndokesei.", "texto_base": "Mitã ndokesei gueteri.", "tipo_transformacion": "reordenar", "dominio": "vida cotidiana", "estrategia": "3", "seed_file": "tatoeba.jsonl"}

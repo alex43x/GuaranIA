@@ -1,0 +1,1 @@
+{"texto": "Chipa guasu ha'e hi'upy he'ovéva opaite Paraguáipe.", "texto_base": "Chipa guasu ha'e tembi'u he'ovéva opaite Paraguáipe.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "comida", "seed_file": "tatoeba.jsonl", "estrategia": "3"}

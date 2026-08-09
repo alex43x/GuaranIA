@@ -1,0 +1,1 @@
+{"texto": "Che túva ohayhu opurahéi che sy ndive.", "texto_base": "Che ru ohayhu opurahéi che sy ndive.", "tipo_transformacion": "diccionario_1reemplazos", "detalle_reemplazos": ["sustantivo"], "dominio": "familia", "seed_file": "tatoeba.jsonl", "estrategia": "3"}
