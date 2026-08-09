@@ -111,6 +111,7 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
     import time
     from google import genai
     from google.genai.errors import ServerError
+    from workers import mapear_paralelo
 
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
     if not api_key:
@@ -135,24 +136,37 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
                     print(f"  [Error] Fallo tras {max_reintentos} intentos: {e}")
                     raise
 
+    # Cada generación es independiente entre sí (no hay dedup que dependa del
+    # orden, a diferencia de Estrategia 3), así que se puede aplanar todo en
+    # una sola lista de tareas y paralelizarlas sin preservar orden interno.
+    tareas = [dominio for dominio in dominios for _ in range(por_dominio)]
+    total = len(tareas)
+
+    def procesar_tarea(dominio: str) -> tuple[str, str, str]:
+        prompt = armar_prompt(ejemplos_few_shot, dominio)
+        texto_generado = generar_con_reintentos(prompt)
+        return dominio, prompt, texto_generado
+
+    contador = {"completadas": 0}
+
+    def al_completar(idx, dominio, resultado):
+        contador["completadas"] += 1
+        print(f"  [{contador['completadas']}/{total}] dominio={dominio} ✓", flush=True)
+
+    resultados = mapear_paralelo(tareas, procesar_tarea, on_completado=al_completar)
+
     registros = []
     prompts = []
-    total = len(dominios) * por_dominio
-    actual = 0
-    for dominio in dominios:
-        for _ in range(por_dominio):
-            actual += 1
-            prompt = armar_prompt(ejemplos_few_shot, dominio)
-            texto_generado = generar_con_reintentos(prompt)
-            registros.append({
-                "texto": texto_generado,
-                "dominio": dominio,
-                "estrategia": "5",
-                "prompt": prompt,
-                "seed_file": seed_file_name,
-            })
-            prompts.append(prompt)
-            print(f"  [{actual}/{total}] dominio={dominio} ✓")
+    for dominio, prompt, texto_generado in resultados:
+        registros.append({
+            "texto": texto_generado,
+            "dominio": dominio,
+            "estrategia": "5",
+            "prompt": prompt,
+            "seed_file": seed_file_name,
+        })
+        prompts.append(prompt)
+
     seed_stem = os.path.splitext(seed_file_name)[0] if seed_file_name else None
     subcarpeta = f"estrategia5/{seed_stem}" if seed_stem else None
     ruta = guardar_lote(registros, estrategia="5", subcarpeta=subcarpeta)

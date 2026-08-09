@@ -261,23 +261,41 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
         raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
     client = genai.Client(api_key=api_key)
 
+    # Cada generación es independiente entre sí, así que se aplana todo en
+    # una sola lista de tareas y se paraleliza sin preservar orden interno.
+    tareas = [dominio for dominio in dominios for _ in range(por_dominio)]
+    total = len(tareas)
+
+    def procesar_tarea(dominio: str) -> tuple[str, str, str | None]:
+        prompt = armar_prompt(ejemplos_few_shot, dominio)
+        texto_generado = llamar_gemini_con_reintentos(client, prompt)
+        return dominio, prompt, texto_generado
+
+    contador = {"completadas": 0}
+
+    def al_completar(idx, dominio, resultado):
+        contador["completadas"] += 1
+        _, _, texto_generado = resultado
+        estado = "✓" if texto_generado is not None else "✗ (falló tras reintentos)"
+        print(f"  [{contador['completadas']}/{total}] dominio={dominio} {estado}", flush=True)
+
+    resultados = mapear_paralelo(tareas, procesar_tarea, on_completado=al_completar)
+
     registros = []
     prompts = []
     fallidas = 0
-    for dominio in dominios:
-        for _ in range(por_dominio):
-            prompt = armar_prompt(ejemplos_few_shot, dominio)
-            texto_generado = llamar_gemini_con_reintentos(client, prompt)
-            if texto_generado is None:
-                fallidas += 1
-                continue
-            registros.append({
-                "texto": texto_generado,
-                "dominio": dominio,
-                "estrategia": "5",
-                "prompt": prompt,
-            })
-            prompts.append(prompt)
+    for dominio, prompt, texto_generado in resultados:
+        if texto_generado is None:
+            fallidas += 1
+            continue
+        registros.append({
+            "texto": texto_generado,
+            "dominio": dominio,
+            "estrategia": "5",
+            "prompt": prompt,
+        })
+        prompts.append(prompt)
+
     if fallidas > 0:
         print(f"⚠️  {fallidas} generaciones fallaron incluso con reintentos y se omitieron.")
     ruta = guardar_lote(registros, estrategia="5")
