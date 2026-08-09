@@ -11,6 +11,7 @@ Necesita: .env con GEMINI_API_KEY
 import os
 import json
 import random
+import threading
 import time
 from datetime import datetime
 from dotenv import load_dotenv
@@ -22,6 +23,7 @@ load_dotenv()
 CARPETA_RAW = "raw"
 MAX_REINTENTOS = 3
 ESPERA_ENTRE_REINTENTOS = 5  # segundos, se duplica en cada intento
+TIMEOUT_GEMINI_MS = 60_000  # si una llamada se cuelga más de esto, falla y se reintenta
 
 
 def guardar_lote(registros: list[dict], estrategia: str, subcarpeta: str | None = None) -> str:
@@ -145,15 +147,55 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
     diccionario_estrategia3.py). Intenta hasta max_reordenaciones
     variantes distintas por oración — se detiene antes si dos intentos
     seguidos no dan nada nuevo (sin inventar variantes que no existen).
+
+    Escribe cada variante a disco (append + flush) apenas se genera, en vez
+    de acumular todo en memoria y guardar recién al final — así, si el
+    proceso se cuelga y hay que matarlo, lo ya generado no se pierde. Cada
+    llamada a Gemini además tiene un timeout de TIMEOUT_GEMINI_MS: si la
+    red se cuelga a mitad de un request, ese intento falla solo y se
+    reintenta (con backoff) en vez de bloquear el hilo para siempre.
     """
     from google import genai
+    from google.genai import types
 
     api_key = os.getenv("GEMINI_API_KEY") or os.getenv("API_KEY")
     if not api_key:
         raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
-    client = genai.Client(api_key=api_key)
+    client = genai.Client(api_key=api_key, http_options=types.HttpOptions(timeout=TIMEOUT_GEMINI_MS))
 
-    def procesar_semilla(semilla: dict) -> tuple[list[dict], int]:
+    # ── Escritura incremental ───────────────────────────────────
+    # El archivo de destino se decide por seed_file, que ya se conoce ANTES
+    # de generar nada (no depende de la respuesta de Gemini): se abre la
+    # primera vez que hace falta y se escribe cada variante apenas se
+    # produce, sin esperar a que termine todo el lote. Un solo lock global
+    # protege apertura + escritura (el costo es despreciable frente a la
+    # latencia de red de cada llamada a Gemini).
+    lock_escritura = threading.Lock()
+    archivos_abiertos: dict[str, object] = {}
+    rutas_por_seed: dict[str, str] = {}
+    conteo_por_seed: dict[str, int] = {}
+
+    def escribir_registro(registro: dict) -> None:
+        seed_file = registro.get("seed_file", "")
+        with lock_escritura:
+            if seed_file not in archivos_abiertos:
+                if seed_file:
+                    seed_stem = os.path.splitext(os.path.basename(seed_file))[0]
+                    carpeta = os.path.join(CARPETA_RAW, "estrategia3", seed_stem, "reordenar")
+                else:
+                    carpeta = os.path.join(CARPETA_RAW, "estrategia3")
+                os.makedirs(carpeta, exist_ok=True)
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                ruta = os.path.join(carpeta, f"lote_{timestamp}.jsonl")
+                archivos_abiertos[seed_file] = open(ruta, "w", encoding="utf-8")
+                rutas_por_seed[seed_file] = ruta
+                conteo_por_seed[seed_file] = 0
+            f = archivos_abiertos[seed_file]
+            f.write(json.dumps(registro, ensure_ascii=False) + "\n")
+            f.flush()
+            conteo_por_seed[seed_file] += 1
+
+    def procesar_semilla(semilla: dict) -> tuple[int, int]:
         """Corre las hasta max_reordenaciones variantes de UNA semilla, en orden
         (la lógica de dedup/corte temprano depende de ese orden). Lo que
         mapear_paralelo() paraleliza es esto corriendo para varias semillas
@@ -161,7 +203,7 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
         variantes_vistas = []
         intentos_sin_exito_seguidos = 0
         seed_file = semilla.get("seed_file", "")
-        registros_semilla = []
+        n_generadas = 0
         sin_variacion_semilla = 0
 
         preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
@@ -186,7 +228,7 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
 
             variantes_vistas.append(clave)
             intentos_sin_exito_seguidos = 0
-            registros_semilla.append({
+            escribir_registro({
                 "texto": variante,
                 "texto_base": semilla["texto"],
                 "tipo_transformacion": "reordenar",
@@ -194,50 +236,43 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
                 "estrategia": "3",
                 "seed_file": seed_file,
             })
+            n_generadas += 1
 
-        return registros_semilla, sin_variacion_semilla
+        return n_generadas, sin_variacion_semilla
 
-    registros = []
-    sin_variacion = 0
     total = len(oraciones_semilla)
     completadas = 0
+    sin_variacion = 0
 
     def al_completar(idx, semilla, resultado):
         nonlocal completadas
         completadas += 1
-        registros_semilla, _ = resultado
+        n_generadas, _ = resultado
         seed_file = semilla.get("seed_file", "")
         seed_tag = os.path.splitext(os.path.basename(seed_file))[0] if seed_file else "?"
         preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
-        print(f"  [{completadas}/{total}] ({seed_tag}) \"{preview}\" → {len(registros_semilla)} variantes", flush=True)
+        print(f"  [{completadas}/{total}] ({seed_tag}) \"{preview}\" → {n_generadas} variantes", flush=True)
 
-    resultados = mapear_paralelo(oraciones_semilla, procesar_semilla, on_completado=al_completar)
+    try:
+        resultados = mapear_paralelo(oraciones_semilla, procesar_semilla, on_completado=al_completar)
+    finally:
+        # Pase lo que pase (éxito, excepción, Ctrl+C) lo ya escrito queda
+        # bien cerrado y con el buffer del SO vaciado.
+        with lock_escritura:
+            for f in archivos_abiertos.values():
+                f.close()
 
-    for registros_semilla, sin_variacion_semilla in resultados:
-        registros.extend(registros_semilla)
+    for _, sin_variacion_semilla in resultados:
         sin_variacion += sin_variacion_semilla
 
     if sin_variacion > 0:
         print(f"ℹ️  {sin_variacion} intentos sin variación posible (oración muy corta, "
               f"o resultado idéntico al original) — no son errores, se omitieron.")
 
-    # Agrupar por seed_file y guardar en subcarpetas (análogo a Estrategia 5)
-    agrupados: dict[str, list[dict]] = {}
-    for reg in registros:
-        key = reg.get("seed_file", "")
-        agrupados.setdefault(key, []).append(reg)
+    for seed_file, ruta in rutas_por_seed.items():
+        print(f"[Lead Dev] Lote guardado: {ruta} ({conteo_por_seed[seed_file]} registros)")
 
-    rutas = []
-    for seed_file, grupo in agrupados.items():
-        if seed_file:
-            seed_stem = os.path.splitext(os.path.basename(seed_file))[0]
-            subcarpeta = os.path.join("estrategia3", seed_stem, "reordenar")
-            ruta = guardar_lote(grupo, estrategia="3", subcarpeta=subcarpeta)
-        else:
-            ruta = guardar_lote(grupo, estrategia="3")
-        rutas.append(ruta)
-
-    return rutas
+    return list(rutas_por_seed.values())
 
 
 # ─────────────────────────────────────────────────────────────
