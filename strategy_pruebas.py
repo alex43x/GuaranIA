@@ -164,6 +164,9 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
         registros_semilla = []
         sin_variacion_semilla = 0
 
+        preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
+        print(f"  → arrancando: \"{preview}\"", flush=True)
+
         for _ in range(max_reordenaciones):
             variante = transformar_oracion(semilla["texto"], client, tipo_cambio="reordenar")
 
@@ -197,15 +200,22 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
     registros = []
     sin_variacion = 0
     total = len(oraciones_semilla)
-    resultados = mapear_paralelo(oraciones_semilla, procesar_semilla)
+    completadas = 0
 
-    for i, (semilla, (registros_semilla, sin_variacion_semilla)) in enumerate(zip(oraciones_semilla, resultados), 1):
+    def al_completar(idx, semilla, resultado):
+        nonlocal completadas
+        completadas += 1
+        registros_semilla, _ = resultado
         seed_file = semilla.get("seed_file", "")
         seed_tag = os.path.splitext(os.path.basename(seed_file))[0] if seed_file else "?"
         preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
+        print(f"  [{completadas}/{total}] ({seed_tag}) \"{preview}\" → {len(registros_semilla)} variantes", flush=True)
+
+    resultados = mapear_paralelo(oraciones_semilla, procesar_semilla, on_completado=al_completar)
+
+    for registros_semilla, sin_variacion_semilla in resultados:
         registros.extend(registros_semilla)
         sin_variacion += sin_variacion_semilla
-        print(f"  [{i}/{total}] ({seed_tag}) \"{preview}\" → {len(registros_semilla)} variantes", flush=True)
 
     if sin_variacion > 0:
         print(f"ℹ️  {sin_variacion} intentos sin variación posible (oración muy corta, "

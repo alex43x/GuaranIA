@@ -590,6 +590,8 @@ if __name__ == "__main__":
         config = config_para_fuente(fuente)
         resultado = {"item": item, "fuente": fuente, "diag": {}, "variantes": None, "deshabilitado": False}
 
+        print(f"  → arrancando: \"{item['texto'][:70]}\"", flush=True)
+
         if not config["sinonimos_habilitado"]:
             resultado["deshabilitado"] = True
             return resultado
@@ -602,12 +604,16 @@ if __name__ == "__main__":
         )
         return resultado
 
-    resultados = mapear_paralelo(semillas, procesar_item)
+    contador = {"completadas": 0}
 
-    for i, resultado in enumerate(resultados, 1):
+    def al_completar(idx, item, resultado):
+        contador["completadas"] += 1
+        print(f"  [{contador['completadas']}/{total}] listo: \"{item['texto'][:70]}\"", flush=True)
+
+    resultados = mapear_paralelo(semillas, procesar_item, on_completado=al_completar)
+
+    for resultado in resultados:
         item = resultado["item"]
-        print(f"  [{i}/{total}] {item['texto'][:70]}", flush=True)
-
         for clave, valor in resultado["diag"].items():
             diagnostico[clave] = diagnostico.get(clave, 0) + valor
 
