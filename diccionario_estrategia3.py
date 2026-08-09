@@ -45,6 +45,7 @@ COLUMNAS_ADJ = [
 ]
 
 from config_por_fuente import config_para_fuente
+from workers import mapear_paralelo
 
 
 # ─────────────────────────────────────────────────────────────
@@ -578,21 +579,43 @@ if __name__ == "__main__":
     ignoradas_por_config_fuente = 0
     diagnostico = {}
     total = len(semillas)
-    for i, item in enumerate(semillas, 1):
-        print(f"  [{i}/{total}] {item['texto'][:70]}", flush=True)
+
+    def procesar_item(item: dict) -> dict:
+        """Procesa UNA semilla contra el diccionario. Cada llamada usa su propio
+        diagnostico local (no comparte el dict global) porque mapear_paralelo()
+        corre esto en varios threads a la vez, y un dict mutado por += desde
+        varios threads a la vez no es seguro. Se mergea todo en el thread
+        principal después, al recorrer los resultados."""
         fuente = item.get("seed_file", "desconocido")
         config = config_para_fuente(fuente)
+        resultado = {"item": item, "fuente": fuente, "diag": {}, "variantes": None, "deshabilitado": False}
 
         if not config["sinonimos_habilitado"]:
-            ignoradas_por_config_fuente += 1
-            continue
+            resultado["deshabilitado"] = True
+            return resultado
 
-        variantes = aplicar_diccionario(
+        resultado["variantes"] = aplicar_diccionario(
             item["texto"], df_nouns, df_verbs, df_adj, palabras_ambiguas, client,
             pos_permitidos=config["pos_permitidos"],
             max_reemplazos=3, max_variantes=1,
-            diagnostico=diagnostico,
+            diagnostico=resultado["diag"],
         )
+        return resultado
+
+    resultados = mapear_paralelo(semillas, procesar_item)
+
+    for i, resultado in enumerate(resultados, 1):
+        item = resultado["item"]
+        print(f"  [{i}/{total}] {item['texto'][:70]}", flush=True)
+
+        for clave, valor in resultado["diag"].items():
+            diagnostico[clave] = diagnostico.get(clave, 0) + valor
+
+        if resultado["deshabilitado"]:
+            ignoradas_por_config_fuente += 1
+            continue
+
+        variantes = resultado["variantes"]
         if not variantes:
             ignoradas_por_pocos_candidatos += 1
             continue
@@ -603,7 +626,7 @@ if __name__ == "__main__":
                 "tipo_transformacion": f"diccionario_{len(metodos)}reemplazos",
                 "detalle_reemplazos": metodos,
                 "dominio": item.get("dominio", "sin_clasificar"),
-                "seed_file": fuente,
+                "seed_file": resultado["fuente"],
                 "estrategia": "3",
             })
 

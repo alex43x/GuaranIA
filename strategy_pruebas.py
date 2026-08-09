@@ -15,6 +15,8 @@ import time
 from datetime import datetime
 from dotenv import load_dotenv
 
+from workers import mapear_paralelo
+
 load_dotenv()
 
 CARPETA_RAW = "raw"
@@ -151,21 +153,22 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
         raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
     client = genai.Client(api_key=api_key)
 
-    registros = []
-    sin_variacion = 0
-    total = len(oraciones_semilla)
-    for i, semilla in enumerate(oraciones_semilla, 1):
+    def procesar_semilla(semilla: dict) -> tuple[list[dict], int]:
+        """Corre las hasta max_reordenaciones variantes de UNA semilla, en orden
+        (la lógica de dedup/corte temprano depende de ese orden). Lo que
+        mapear_paralelo() paraleliza es esto corriendo para varias semillas
+        a la vez, no las variantes dentro de una misma semilla."""
         variantes_vistas = []
         intentos_sin_exito_seguidos = 0
         seed_file = semilla.get("seed_file", "")
-        seed_tag = os.path.splitext(os.path.basename(seed_file))[0] if seed_file else "?"
-        preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
+        registros_semilla = []
+        sin_variacion_semilla = 0
 
         for _ in range(max_reordenaciones):
             variante = transformar_oracion(semilla["texto"], client, tipo_cambio="reordenar")
 
             if variante is None:
-                sin_variacion += 1
+                sin_variacion_semilla += 1
                 intentos_sin_exito_seguidos += 1
                 if intentos_sin_exito_seguidos >= 2:
                     break
@@ -180,7 +183,7 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
 
             variantes_vistas.append(clave)
             intentos_sin_exito_seguidos = 0
-            registros.append({
+            registros_semilla.append({
                 "texto": variante,
                 "texto_base": semilla["texto"],
                 "tipo_transformacion": "reordenar",
@@ -189,8 +192,21 @@ def generar_estrategia_3(oraciones_semilla: list[dict], max_reordenaciones: int 
                 "seed_file": seed_file,
             })
 
-        n = len(variantes_vistas)
-        print(f"  [{i}/{total}] ({seed_tag}) \"{preview}\" → {n} variantes", flush=True)
+        return registros_semilla, sin_variacion_semilla
+
+    registros = []
+    sin_variacion = 0
+    total = len(oraciones_semilla)
+    resultados = mapear_paralelo(oraciones_semilla, procesar_semilla)
+
+    for i, (semilla, (registros_semilla, sin_variacion_semilla)) in enumerate(zip(oraciones_semilla, resultados), 1):
+        seed_file = semilla.get("seed_file", "")
+        seed_tag = os.path.splitext(os.path.basename(seed_file))[0] if seed_file else "?"
+        preview = semilla["texto"][:50] + ("..." if len(semilla["texto"]) > 50 else "")
+        registros.extend(registros_semilla)
+        sin_variacion += sin_variacion_semilla
+        print(f"  [{i}/{total}] ({seed_tag}) \"{preview}\" → {len(registros_semilla)} variantes", flush=True)
+
     if sin_variacion > 0:
         print(f"ℹ️  {sin_variacion} intentos sin variación posible (oración muy corta, "
               f"o resultado idéntico al original) — no son errores, se omitieron.")
