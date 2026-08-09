@@ -118,23 +118,30 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
         raise ValueError("Falta GEMINI_API_KEY o API_KEY en el .env")
     client = genai.Client(api_key=api_key)
 
-    def generar_con_reintentos(prompt: str, max_reintentos: int = 4, espera_inicial: float = 5.0) -> str:
-        """Llama a la API con reintentos en caso de error 500 transitorio."""
+    def generar_con_reintentos(prompt: str, max_reintentos: int = 4, espera_inicial: float = 5.0) -> str | None:
+        """Llama a la API con reintentos en caso de error 500 transitorio o de
+        respuesta sin texto (ej. bloqueada por el filtro de seguridad de Gemini).
+
+        Si se agotan los reintentos, devuelve None en vez de propagar la
+        excepción — así una generación fallida no tumba todo el lote (los
+        demás items del ThreadPoolExecutor siguen corriendo igual)."""
         for intento in range(1, max_reintentos + 1):
             try:
                 response = client.models.generate_content(
                     model="gemini-3.5-flash",
                     contents=prompt,
                 )
+                if response.text is None:
+                    raise ValueError("respuesta vacía de Gemini (posible bloqueo por filtro de seguridad)")
                 return response.text.strip()
-            except ServerError as e:
+            except (ServerError, ValueError) as e:
                 if intento < max_reintentos:
                     espera = espera_inicial * (2 ** (intento - 1))  # backoff exponencial
-                    print(f"  [Reintento {intento}/{max_reintentos - 1}] Error 500 de Gemini. Esperando {espera:.0f}s...")
+                    print(f"  [Reintento {intento}/{max_reintentos - 1}] {e}. Esperando {espera:.0f}s...")
                     time.sleep(espera)
                 else:
                     print(f"  [Error] Fallo tras {max_reintentos} intentos: {e}")
-                    raise
+                    return None
 
     # Cada generación es independiente entre sí (no hay dedup que dependa del
     # orden, a diferencia de Estrategia 3), así que se puede aplanar todo en
@@ -151,13 +158,19 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
 
     def al_completar(idx, dominio, resultado):
         contador["completadas"] += 1
-        print(f"  [{contador['completadas']}/{total}] dominio={dominio} ✓", flush=True)
+        _, _, texto_generado = resultado
+        estado = "✓" if texto_generado is not None else "✗ (falló tras reintentos)"
+        print(f"  [{contador['completadas']}/{total}] dominio={dominio} {estado}", flush=True)
 
     resultados = mapear_paralelo(tareas, procesar_tarea, on_completado=al_completar)
 
     registros = []
     prompts = []
+    fallidas = 0
     for dominio, prompt, texto_generado in resultados:
+        if texto_generado is None:
+            fallidas += 1
+            continue
         registros.append({
             "texto": texto_generado,
             "dominio": dominio,
@@ -166,6 +179,9 @@ def generar_estrategia_5(ejemplos_few_shot: list[str], dominios: list[str], por_
             "seed_file": seed_file_name,
         })
         prompts.append(prompt)
+
+    if fallidas > 0:
+        print(f"⚠️  {fallidas} generaciones fallaron incluso con reintentos y se omitieron.")
 
     seed_stem = os.path.splitext(seed_file_name)[0] if seed_file_name else None
     subcarpeta = f"estrategia5/{seed_stem}" if seed_stem else None
